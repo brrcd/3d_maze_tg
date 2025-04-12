@@ -427,3 +427,32 @@ document.addEventListener('click', () => {
 }, { once: true });
 
 animate();
+
+window.addEventListener('pagehide', () => {
+  if (sound.context && sound.context.state !== 'closed') {
+    sound.context.close();
+  }
+});
+
+window.addEventListener('beforeunload', () => {
+  if (sound && sound.isPlaying) {
+    sound.stop(); // или sound.pause();
+  }
+});
+
+// И на всякий случай:
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    if (sound && sound.isPlaying) {
+      sound.pause(); // пауза при сворачивании
+    }
+  }
+});
+
+if (window.Telegram && Telegram.WebApp) {
+  Telegram.WebApp.onEvent('close', () => {
+    if (sound && sound.isPlaying) {
+      sound.stop();
+    }
+  });
+}
