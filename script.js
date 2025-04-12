@@ -59,17 +59,12 @@ let mixer;
 let animations = {};
 let currentAction;
 
-let mixer;
-let animations = {};
-let currentAction;
-
 fbxLoader.load(
   'assets/models/Hazmat_Character.fbx',
   (fbx) => {
     player = fbx;
     player.name = 'player';
     player.scale.set(0.01, 0.01, 0.01);
-    player.position.y = 0;
     player.position.y = 0;
     player.rotation.y = Math.PI;
 
@@ -115,28 +110,6 @@ function loadAnimation(name, path) {
     animations[name] = animFbx.animations[0];
     console.log(`Анимация ${name} загружена`);
   });
-}
-
-let lastAnimation = '';
-function playAnimation(name) {
-  if (!animations[name] || !mixer) {
-    console.error(`Анимация "${name}" не загружена или mixer отсутствует`);
-    return;
-  }
-  if (lastAnimation === name) return; // Не прерывать текущую анимацию
-
-  if (currentAction) {
-    currentAction.fadeOut(0.2); // Плавное затухание
-  }
-
-  currentAction = mixer.clipAction(animations[name]);
-  currentAction.reset()
-    .setEffectiveTimeScale(1)
-    .setEffectiveWeight(1)
-    .fadeIn(0.2) // Плавное появление
-    .play();
-
-  lastAnimation = name;
 }
 
 function loadAnimation(name, path) {
@@ -322,13 +295,6 @@ function handlePlayerMovement() {
       moveVector.x,
       moveVector.z
     );
-    if (speed > 0.05) {
-      playAnimation('Running1');
-    } else {
-      playAnimation('Walking');
-    }
-  } else {
-    playAnimation('Idle');
     if (speed > 0.05) {
       playAnimation('Running1');
     } else {
@@ -561,12 +527,9 @@ function animateCD(deltaTime) {
 function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
-  const delta = clock.getDelta();
 
   if (mixer) mixer.update(delta);
-  if (mixer) mixer.update(delta);
   if (playerReady) {
-    animateCD(delta);
     animateCD(delta);
     handlePlayerMovement();
     updateCamera();
