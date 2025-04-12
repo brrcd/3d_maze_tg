@@ -1,0 +1,48 @@
+/* Убирает скролл и белые отступы */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+#joystick-container {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 100;
+  }
+  
+  .joystick {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    bottom: 30px;
+  }
+  
+  #left-joystick {
+    left: 30px;
+  }
+  
+  #right-joystick {
+    right: 30px;
+  }
+  
+  .joystick-area {
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    pointer-events: auto;
+  }
+  
+  .joystick-thumb {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
