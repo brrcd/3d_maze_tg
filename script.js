@@ -23,9 +23,10 @@ const movementSpeed = 0.1;
 const rotationSpeed = 0.03;
 
 function updateCamera() {
+  if (!playerReady) return; // Не обновляем камеру без игрока
+
   const camX = player.position.x + Math.sin(cameraAngle) * cameraDistance;
   const camZ = player.position.z + Math.cos(cameraAngle) * cameraDistance;
-
   camera.position.set(camX, player.position.y + cameraHeight, camZ);
   camera.lookAt(player.position.x, player.position.y, player.position.z);
 }
@@ -39,12 +40,49 @@ light.position.set(1, 1, 1);
 scene.add(light);
 scene.add(new THREE.AmbientLight(0x404040));
 
-const player = new THREE.Mesh(
-  new THREE.BoxGeometry(1, 1, 1),
-  new THREE.MeshPhongMaterial({ color: 0xff0000 })
+let player;
+let playerReady = false;
+
+// Фолбэк-игрок (красный куб)
+function createFallbackPlayer() {
+  player = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshPhongMaterial({ color: 0xff0000 })
+  );
+  player.position.y = 0.5;
+  scene.add(player);
+  playerReady = true;
+}
+
+// Загрузка FBX модели
+const fbxLoader = new THREE.FBXLoader();
+fbxLoader.load(
+  'assets/models/Hazmat_Character.fbx',
+  (fbx) => {
+    player = fbx;
+    player.name = 'player';
+    player.scale.set(0.01, 0.01, 0.01);
+    player.position.y = 0.5;
+    player.rotation.y = Math.PI;
+
+    player.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+
+    scene.add(player);
+    playerReady = true;
+  },
+  (xhr) => {
+    console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+  },
+  (error) => {
+    console.error('Error loading FBX:', error);
+    createFallbackPlayer();
+  }
 );
-player.position.y = 0.5;
-scene.add(player);
 
 const groundTexture = textureLoader.load('assets/textures/Horror_Floor_12-128x128.png');
 groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
@@ -104,10 +142,12 @@ wallPositions.forEach(pos => {
 });
 
 function checkCollision(position) {
-  const playerSize = 0.5;
+  if (!playerReady) return { collision: false, slideVector: new THREE.Vector3() };
+
+  const playerSize = new THREE.Vector3(0.8, 1.5, 0.8); // Подберите под вашу модель
   const playerBox = new THREE.Box3(
-    new THREE.Vector3().copy(position).subScalar(playerSize),
-    new THREE.Vector3().copy(position).addScalar(playerSize)
+    new THREE.Vector3().copy(position).sub(playerSize),
+    new THREE.Vector3().copy(position).add(playerSize)
   );
 
   let collision = false;
@@ -137,6 +177,7 @@ function checkCollision(position) {
 }
 
 function handlePlayerMovement() {
+  if (!playerReady) return;
   const direction = new THREE.Vector3();
   camera.getWorldDirection(direction);
   direction.y = 0;
@@ -188,6 +229,13 @@ function handlePlayerMovement() {
     }
   } else {
     player.position.copy(newPosition);
+  }
+
+  if (moveVector.length() > 0) {
+    player.rotation.y = Math.atan2(
+      moveVector.x,
+      moveVector.z
+    );
   }
 
   updateCamera();
@@ -335,17 +383,17 @@ cd.material.emissiveIntensity = 0.5;
 // cd.material.emissiveMap = cdTexture;
 
 function checkPlayerProximity() {
+  if (!playerReady) return false; // Проверка готовности
+
   const distance = player.position.distanceTo(cd.position);
   const isClose = distance < 2.5;
 
   if (isClose) {
-    if (!sound.isPlaying) {
-      sound.play();
-    }
-    tweenVolumeTo(0.5); // Плавно увеличиваем громкость
+    if (!sound.isPlaying) sound.play();
+    tweenVolumeTo(0.5);
     cd.material.emissiveIntensity = 0.5;
   } else {
-    tweenVolumeTo(0); // Плавно уменьшаем до 0 и ставим на паузу
+    tweenVolumeTo(0);
     cd.material.emissiveIntensity = 0;
   }
 
@@ -413,16 +461,20 @@ function animateCD(deltaTime) {
 function animate() {
   requestAnimationFrame(animate);
   const deltaTime = clock.getDelta();
-  animateCD(deltaTime);
-  handlePlayerMovement();
-  updateCamera();
+
+  if (playerReady) {
+    animateCD(deltaTime);
+    handlePlayerMovement();
+    updateCamera();
+  }
+
   renderer.render(scene, camera);
 }
 
 // Обработчик клика для разблокировки аудио
 document.addEventListener('click', () => {
   if (sound.context.state === 'suspended') {
-      sound.context.resume();
+    sound.context.resume();
   }
 }, { once: true });
 
