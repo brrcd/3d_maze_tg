@@ -54,15 +54,18 @@ function createFallbackPlayer() {
   playerReady = true;
 }
 
-// Загрузка FBX модели
 const fbxLoader = new THREE.FBXLoader();
+let mixer;
+let animations = {};
+let currentAction;
+
 fbxLoader.load(
   'assets/models/Hazmat_Character.fbx',
   (fbx) => {
     player = fbx;
     player.name = 'player';
     player.scale.set(0.01, 0.01, 0.01);
-    player.position.y = 0.5;
+    player.position.y = 0;
     player.rotation.y = Math.PI;
 
     player.traverse((child) => {
@@ -74,6 +77,25 @@ fbxLoader.load(
 
     scene.add(player);
     playerReady = true;
+    mixer = new THREE.AnimationMixer(player);
+
+    // 2. Проверяем доступные анимации
+    console.log('Available animations:', fbx.animations);
+    loadAnimation('Running', 'assets/models/animations/Hazmat_Character_Running.fbx');
+    loadAnimation('Running1', 'assets/models/animations/Hazmat_Character_Running1.fbx');
+    loadAnimation('Walking', 'assets/models/animations/Hazmat_Character_Walking.fbx');
+    loadAnimation('Idle', 'assets/models/animations/Hazmat_Character_Idle.fbx');
+
+    // 3. Если есть анимации - проигрываем первую
+    if (fbx.animations && fbx.animations.length > 0) {
+      const action = mixer.clipAction(fbx.animations[0]);
+      action.play();
+
+      // Для циклической анимации:
+      action.setLoop(THREE.LoopRepeat);
+    } else {
+      console.warn('No animations found in the model');
+    }
   },
   (xhr) => {
     console.log((xhr.loaded / xhr.total * 100) + '% loaded');
@@ -83,6 +105,35 @@ fbxLoader.load(
     createFallbackPlayer();
   }
 );
+
+function loadAnimation(name, path) {
+  fbxLoader.load(path, (animFbx) => {
+    animations[name] = animFbx.animations[0];
+    console.log(`Анимация ${name} загружена`);
+  });
+}
+
+let lastAnimation = '';
+function playAnimation(name) {
+  if (!animations[name] || !mixer) {
+    console.error(`Анимация "${name}" не загружена или mixer отсутствует`);
+    return;
+  }
+  if (lastAnimation === name) return; // Не прерывать текущую анимацию
+
+  if (currentAction) {
+    currentAction.fadeOut(0.2); // Плавное затухание
+  }
+
+  currentAction = mixer.clipAction(animations[name]);
+  currentAction.reset()
+    .setEffectiveTimeScale(1)
+    .setEffectiveWeight(1)
+    .fadeIn(0.2) // Плавное появление
+    .play();
+
+  lastAnimation = name;
+}
 
 const groundTexture = textureLoader.load('assets/textures/Horror_Floor_12-128x128.png');
 groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
@@ -232,10 +283,20 @@ function handlePlayerMovement() {
   }
 
   if (moveVector.length() > 0) {
+    const speed = moveVector.length();
+    console.log(speed);
+    
     player.rotation.y = Math.atan2(
       moveVector.x,
       moveVector.z
     );
+    if (speed > 0.05) {
+      playAnimation('Running1');
+    } else {
+      playAnimation('Walking');
+    }
+  } else {
+    playAnimation('Idle');
   }
 
   updateCamera();
@@ -460,10 +521,11 @@ function animateCD(deltaTime) {
 
 function animate() {
   requestAnimationFrame(animate);
-  const deltaTime = clock.getDelta();
+  const delta = clock.getDelta();
 
+  if (mixer) mixer.update(delta);
   if (playerReady) {
-    animateCD(deltaTime);
+    animateCD(delta);
     handlePlayerMovement();
     updateCamera();
   }
