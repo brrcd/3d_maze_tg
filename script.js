@@ -1,6 +1,7 @@
 // 1. Инициализация сцены, камеры и рендерера
 const scene = new THREE.Scene();
 const textureLoader = new THREE.TextureLoader();
+const clock = new THREE.Clock();
 scene.background = new THREE.Color(0x87CEEB); // Голубой фон (небо)
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -329,11 +330,67 @@ function setupJoystick(joystickElement, type) {
 
 initJoysticks();
 
+const cdGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.01, 24);
+const cdMaterial = new THREE.MeshPhongMaterial({
+  color: 0x00ffff, // Голубой цвет
+  shininess: 100,
+  specular: 0x111111
+});
+
+const cd = new THREE.Mesh(cdGeometry, cdMaterial);
+cd.position.set(1, 1, -10); // Позиция над полом
+cd.rotation.z = Math.PI / 2;
+scene.add(cd);
+
+// 3. Проверка приближения игрока
+function checkPlayerProximity() {
+  const distance = player.position.distanceTo(cd.position);
+  return distance < 2.0; // Активация в радиусе 2 единиц
+}
+
+// 2. Параметры анимации (обновленные для вертикального положения)
+const cdAnimation = {
+  active: false,
+  startTime: 0,
+  duration: 2000,
+  baseY: 1,    // Начальная высота
+  height: 0.3,   // Амплитуда движения вверх-вниз
+  rotation: Math.PI // Вращение на 180 градусов
+};
+
+// 3. Обновленная функция анимации
+function animateCD(deltaTime) {
+  if (!cdAnimation.active) {
+    if (checkPlayerProximity()) {
+      cdAnimation.active = true;
+      cdAnimation.startTime = Date.now();
+    }
+    return;
+  }
+
+  const elapsed = Date.now() - cdAnimation.startTime;
+  const progress = Math.min(elapsed / cdAnimation.duration, 1);
+
+  // Вертикальное движение (вдоль оси Y)
+  cd.position.y = cdAnimation.baseY + (Math.sin(progress * Math.PI) * cdAnimation.height);
+
+  // Вращение вокруг вертикальной оси (Z)
+  cd.rotation.y = progress * cdAnimation.rotation;
+
+  if (progress >= 1) {
+    cdAnimation.active = false;
+    // onCDAnimationComplete();
+  }
+}
+
 // 8. Главный цикл
 function animate() {
   requestAnimationFrame(animate);
+  const deltaTime = clock.getDelta(); // THREE.Clock
+  animateCD(deltaTime);
   handlePlayerMovement();
   updateCamera();
   renderer.render(scene, camera);
 }
+
 animate();
