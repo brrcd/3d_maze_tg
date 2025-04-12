@@ -50,7 +50,7 @@ const groundMaterial = new THREE.MeshStandardMaterial({
 });
 
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(20, 20),
+  new THREE.PlaneGeometry(20, 40),
   groundMaterial
 );
 floor.rotation.x = -Math.PI / 2;
@@ -59,26 +59,43 @@ scene.add(floor);
 
 // Замените текущий код создания стен на этот:
 const walls = [];
-const wallGeometry = new THREE.BoxGeometry(1, 2, 1);
-const wallMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+const basicMaterial = new THREE.MeshStandardMaterial({
+  color: 0x888888,
+  roughness: 0.8,
+  metalness: 0.2
+});
+
+const wallTexture = textureLoader.load('assets/textures/Horror_Brick_01-128x128.png');
+const wallMaterial = new THREE.MeshStandardMaterial({
+  map: wallTexture,
+  roughness: 1,
+  metalness: 0.2,
+  side: THREE.DoubleSide
+});
+wallMaterial.map.repeat.set(30, 2); // Измените при необходимости
+wallMaterial.map.wrapS = THREE.RepeatWrapping;
+wallMaterial.map.wrapT = THREE.RepeatWrapping;
+const wallMaterials = [
+  wallMaterial, // Правая грань (x+)
+  wallMaterial,  // Левая грань (x-)
+  basicMaterial,  // Верхняя грань (y+)
+  basicMaterial,  // Нижняя грань (y-)
+  basicMaterial, // Передняя грань (z+)
+  basicMaterial  // Задняя грань (z-)
+];
+// wallMaterial.map.anisotropy = renderer.capabilities.getMaxAnisotropy();
+const wallGeometry = new THREE.BoxGeometry(1, 2, 30);
 
 // Создаем массив стен и добавляем их в сцену
 const wallPositions = [
-  { x: 3, z: 0 }, { x: -3, z: 0 }, { x: 0, z: 3 }, { x: 0, z: -3 },
-  { x: 2, z: 2 }, { x: -2, z: -2 }
+  { x: 3, z: 0 }, { x: -3, z: 0 }
 ];
 
 wallPositions.forEach(pos => {
-  const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+  const wall = new THREE.Mesh(wallGeometry, wallMaterials);
   wall.position.set(pos.x, 1, pos.z);
   scene.add(wall);
-  walls.push(wall); // Сохраняем ссылки на стены для коллизий
-});
-
-walls.forEach(pos => {
-  const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-  wall.position.set(pos.x, 1, pos.z);
-  scene.add(wall);
+  walls.push(wall);
 });
 
 function checkCollision(position) {
