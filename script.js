@@ -1,5 +1,6 @@
 // 1. Инициализация сцены, камеры и рендерера
 const scene = new THREE.Scene();
+const textureLoader = new THREE.TextureLoader();
 scene.background = new THREE.Color(0x87CEEB); // Голубой фон (небо)
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -37,12 +38,23 @@ const player = new THREE.Mesh(
 player.position.y = 0.5; // Чтобы не "тонул" в полу
 scene.add(player);
 
-// 4. Пол (зелёная плоскость)
+// 4. Пол
+const groundTexture = textureLoader.load('assets/textures/Horror_Floor_12-128x128.png');
+groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
+groundTexture.repeat.set(10, 10); // Повторяем текстуру 10x10
+groundTexture.anisotropy = 16; // Улучшаем качество при наклоне камеры
+const groundMaterial = new THREE.MeshStandardMaterial({
+  map: groundTexture,
+  roughness: 0.8,
+  metalness: 0.2
+});
+
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(20, 20),
-  new THREE.MeshPhongMaterial({ color: 0x00aa00, side: THREE.DoubleSide })
+  groundMaterial
 );
 floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
 scene.add(floor);
 
 // Замените текущий код создания стен на этот:
