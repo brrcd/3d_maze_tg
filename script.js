@@ -1,19 +1,28 @@
-// 1. Инициализация сцены, камеры и рендерера
 const scene = new THREE.Scene();
 const textureLoader = new THREE.TextureLoader();
 const clock = new THREE.Clock();
-scene.background = new THREE.Color(0x87CEEB); // Голубой фон (небо)
+const audioListener = new THREE.AudioListener();
+scene.background = new THREE.Color(0x87CEEB);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const cameraDistance = 5; // Дистанция от игрока
-const cameraHeight = 2;   // Высота камеры над игроком
+camera.add(audioListener);
+const cameraDistance = 5;
+const cameraHeight = 2;
 
-let cameraAngle = 0; // Угол поворота камеры вокруг игрока
+const sound = new THREE.Audio(audioListener);
+const audioLoader = new THREE.AudioLoader();
+
+audioLoader.load('assets/audio/music/platformer_1_underscore_modern.wav', function (buffer) {
+  sound.setBuffer(buffer);
+  sound.setLoop(true);
+  sound.setVolume(0.001);
+});
+
+let cameraAngle = 0;
 const movementSpeed = 0.1;
 const rotationSpeed = 0.03;
 
 function updateCamera() {
-  // Камера вращается вокруг игрока
   const camX = player.position.x + Math.sin(cameraAngle) * cameraDistance;
   const camZ = player.position.z + Math.cos(cameraAngle) * cameraDistance;
 
@@ -25,25 +34,22 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// 2. Освещение
 const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(1, 1, 1);
 scene.add(light);
 scene.add(new THREE.AmbientLight(0x404040));
 
-// 3. Персонаж (красный куб)
 const player = new THREE.Mesh(
   new THREE.BoxGeometry(1, 1, 1),
   new THREE.MeshPhongMaterial({ color: 0xff0000 })
 );
-player.position.y = 0.5; // Чтобы не "тонул" в полу
+player.position.y = 0.5;
 scene.add(player);
 
-// 4. Пол
 const groundTexture = textureLoader.load('assets/textures/Horror_Floor_12-128x128.png');
 groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
-groundTexture.repeat.set(10, 10); // Повторяем текстуру 10x10
-groundTexture.anisotropy = 16; // Улучшаем качество при наклоне камеры
+groundTexture.repeat.set(10, 10);
+groundTexture.anisotropy = 16;
 const groundMaterial = new THREE.MeshStandardMaterial({
   map: groundTexture,
   roughness: 0.8,
@@ -58,7 +64,6 @@ floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
 
-// Замените текущий код создания стен на этот:
 const walls = [];
 const basicMaterial = new THREE.MeshStandardMaterial({
   color: 0x888888,
@@ -73,7 +78,7 @@ const wallMaterial = new THREE.MeshStandardMaterial({
   metalness: 0.2,
   side: THREE.DoubleSide
 });
-wallMaterial.map.repeat.set(30, 2); // Измените при необходимости
+wallMaterial.map.repeat.set(30, 2);
 wallMaterial.map.wrapS = THREE.RepeatWrapping;
 wallMaterial.map.wrapT = THREE.RepeatWrapping;
 const wallMaterials = [
@@ -84,10 +89,9 @@ const wallMaterials = [
   basicMaterial, // Передняя грань (z+)
   basicMaterial  // Задняя грань (z-)
 ];
-// wallMaterial.map.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
 const wallGeometry = new THREE.BoxGeometry(1, 2, 30);
 
-// Создаем массив стен и добавляем их в сцену
 const wallPositions = [
   { x: 3, z: 0 }, { x: -3, z: 0 }
 ];
@@ -133,17 +137,14 @@ function checkCollision(position) {
 }
 
 function handlePlayerMovement() {
-  // Получаем направление камеры (горизонтальная плоскость)
   const direction = new THREE.Vector3();
   camera.getWorldDirection(direction);
   direction.y = 0;
   direction.normalize();
 
-  // Вектор "вправо" перпендикулярен направлению камеры
   const right = new THREE.Vector3();
   right.crossVectors(new THREE.Vector3(0, 1, 0), direction).normalize();
 
-  // Вектор движения
   const moveVector = new THREE.Vector3();
 
   if (joystickData.left.active) {
@@ -151,36 +152,28 @@ function handlePlayerMovement() {
     moveVector.add(right.multiplyScalar(-joystickData.left.x * movementSpeed));
   }
 
-  // Вращение камеры от правого джойстика
   if (joystickData.right.active) {
     cameraAngle += joystickData.right.x * rotationSpeed * 2;
   }
 
-
-  // Применяем движение
   const newPosition = player.position.clone().add(moveVector);
 
-  // Проверка коллизий и скольжение
   const { collision, slideVector } = checkCollision(newPosition);
 
   if (collision) {
-    // Пробуем движение по отдельным осям
     const tryPosition = player.position.clone();
 
-    // Проверка по X
     tryPosition.x = newPosition.x;
     if (!checkCollision(tryPosition).collision) {
       player.position.copy(tryPosition);
     }
 
-    // Проверка по Z
     tryPosition.copy(player.position);
     tryPosition.z = newPosition.z;
     if (!checkCollision(tryPosition).collision) {
       player.position.copy(tryPosition);
     }
 
-    // Скольжение вдоль стены
     if (moveVector.length() > 0) {
       const slideDirection = new THREE.Vector3()
         .crossVectors(slideVector, new THREE.Vector3(0, 1, 0))
@@ -207,14 +200,12 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// Глобальные переменные для джойстиков
 const joystickData = {
   left: { x: 0, y: 0, active: false },
   right: { x: 0, y: 0, active: false }
 };
 const activeTouches = {};
 
-// Инициализация джойстиков
 function initJoysticks() {
   const leftJoystick = document.getElementById('left-joystick');
   const rightJoystick = document.getElementById('right-joystick');
@@ -230,12 +221,11 @@ function setupJoystick(joystickElement, type) {
   const center = { x: rect.width / 2, y: rect.height / 2 };
   const maxDist = rect.width / 3;
 
-  // Храним последнее активное касание для этого джойстика
   let activeTouchId = null;
 
   area.addEventListener('mousedown', (e) => {
-    if (e.button === 0) { // Только левая кнопка мыши
-      activeTouchId = 'mouse'; // Уникальный ID для мыши
+    if (e.button === 0) {
+      activeTouchId = 'mouse';
       activeTouches.mouse = type;
       updateJoystick({
         clientX: e.clientX,
@@ -265,7 +255,6 @@ function setupJoystick(joystickElement, type) {
   });
 
   area.addEventListener('touchstart', (e) => {
-    // Ищем первое свободное касание для этого джойстика
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
       if (!activeTouches[touch.identifier] && !activeTouchId) {
@@ -332,33 +321,75 @@ initJoysticks();
 
 const cdGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.01, 24);
 const cdMaterial = new THREE.MeshPhongMaterial({
-  color: 0x00ffff, // Голубой цвет
+  color: 0x00ffff,
   shininess: 100,
   specular: 0x111111
 });
 
 const cd = new THREE.Mesh(cdGeometry, cdMaterial);
-cd.position.set(1, 1, -10); // Позиция над полом
+cd.position.set(1, 1, -10);
 cd.rotation.z = Math.PI / 2;
 scene.add(cd);
 
-// 3. Проверка приближения игрока
+cd.material.emissiveIntensity = 0.5;
+// cd.material.emissiveMap = cdTexture;
+
 function checkPlayerProximity() {
   const distance = player.position.distanceTo(cd.position);
-  return distance < 2.0; // Активация в радиусе 2 единиц
+  const isClose = distance < 2.5;
+
+  if (isClose) {
+    if (!sound.isPlaying) {
+      sound.play();
+    }
+    tweenVolumeTo(0.5); // Плавно увеличиваем громкость
+    cd.material.emissiveIntensity = 0.5;
+  } else {
+    tweenVolumeTo(0); // Плавно уменьшаем до 0 и ставим на паузу
+    cd.material.emissiveIntensity = 0;
+  }
+
+  return isClose;
 }
 
-// 2. Параметры анимации (обновленные для вертикального положения)
 const cdAnimation = {
   active: false,
   startTime: 0,
   duration: 2000,
-  baseY: 1,    // Начальная высота
-  height: 0.3,   // Амплитуда движения вверх-вниз
-  rotation: Math.PI // Вращение на 180 градусов
+  baseY: 1,
+  height: 0.3,
+  rotation: Math.PI
 };
 
-// 3. Обновленная функция анимации
+let volumeTweenInterval = null;
+let currentTargetVolume = null;
+
+function tweenVolumeTo(targetVolume, speed = 0.05) {
+  if (currentTargetVolume === targetVolume) return;
+  currentTargetVolume = targetVolume;
+
+  if (volumeTweenInterval) clearInterval(volumeTweenInterval);
+
+  volumeTweenInterval = setInterval(() => {
+    const current = sound.getVolume();
+    const diff = targetVolume - current;
+
+    if (Math.abs(diff) < 0.01) {
+      sound.setVolume(targetVolume);
+      if (targetVolume === 0 && sound.isPlaying) {
+        sound.pause();
+      }
+      clearInterval(volumeTweenInterval);
+      volumeTweenInterval = null;
+      currentTargetVolume = null;
+      return;
+    }
+
+    const direction = diff > 0 ? 1 : -1;
+    sound.setVolume(current + direction * speed);
+  }, 100);
+}
+
 function animateCD(deltaTime) {
   if (!cdAnimation.active) {
     if (checkPlayerProximity()) {
@@ -371,26 +402,28 @@ function animateCD(deltaTime) {
   const elapsed = Date.now() - cdAnimation.startTime;
   const progress = Math.min(elapsed / cdAnimation.duration, 1);
 
-  // Вертикальное движение (вдоль оси Y)
   cd.position.y = cdAnimation.baseY + (Math.sin(progress * Math.PI) * cdAnimation.height);
-
-  // Вращение вокруг вертикальной оси (Z)
   cd.rotation.y = progress * cdAnimation.rotation;
 
   if (progress >= 1) {
     cdAnimation.active = false;
-    // onCDAnimationComplete();
   }
 }
 
-// 8. Главный цикл
 function animate() {
   requestAnimationFrame(animate);
-  const deltaTime = clock.getDelta(); // THREE.Clock
+  const deltaTime = clock.getDelta();
   animateCD(deltaTime);
   handlePlayerMovement();
   updateCamera();
   renderer.render(scene, camera);
 }
+
+// Обработчик клика для разблокировки аудио
+document.addEventListener('click', () => {
+  if (sound.context.state === 'suspended') {
+      sound.context.resume();
+  }
+}, { once: true });
 
 animate();
