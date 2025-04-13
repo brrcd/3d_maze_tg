@@ -7,7 +7,7 @@ scene.background = new THREE.Color(0x87CEEB);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.add(audioListener);
 const cameraDistance = 5;
-const cameraHeight = 2;
+const cameraHeight = 3;
 
 const sound = new THREE.Audio(audioListener);
 const audioLoader = new THREE.AudioLoader();
@@ -266,7 +266,7 @@ const wallMaterials = [
   basicMaterial  // Задняя грань (z-)
 ];
 
-const wallGeometry = new THREE.BoxGeometry(1, 2, 30);
+const wallGeometry = new THREE.BoxGeometry(1, 3, 30);
 
 const wallPositions = [
   { x: 3, z: 0 }, { x: -3, z: 0 }
@@ -376,11 +376,11 @@ function handlePlayerMovement() {
       moveVector.x,
       moveVector.z
     );
-    // if (speed > 0.05) {
-      // playAnimation('Running1');
-    // } else {
+    if (speed > 0.05) {
+      playAnimation('Running1');
+    } else {
       playAnimation('Walking');
-    // }
+    }
   } else {
     playAnimation('Idle');
   }
@@ -606,7 +606,7 @@ function animateCD(deltaTime) {
   }
 }
 
-const targetFPS = 30;
+const targetFPS = 120;
 const frameTime = 1000 / targetFPS;
 let lastFrameTime = 0;
 
