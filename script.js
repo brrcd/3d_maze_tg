@@ -35,17 +35,18 @@ const renderer = new THREE.WebGLRenderer({
   antialias: false, // Отключаем сглаживание
   powerPreference: "low-power" // Эмулируем слабый GPU
 });
-renderer.setPixelRatio(1); // Фиксируем пиксельное соотношение
+renderer.setPixelRatio(3); // Фиксируем пиксельное соотношение
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.LinearEncoding; // Отключаем гамма-коррекцию
+renderer.toneMapping = THREE.NoToneMapping; // Отключаем тональное отображение
+
 document.body.appendChild(renderer.domElement);
 
 const DitherShader = {
   uniforms: {
     tDiffuse: { value: null },
     resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-    pixelSize: { value: 1 } // Увеличиваем для более заметного эффекта
+    pixelSize: { value: 3 } // Увеличиваем для более заметного эффекта
   },
   vertexShader: `
     varying vec2 vUv;
@@ -375,11 +376,11 @@ function handlePlayerMovement() {
       moveVector.x,
       moveVector.z
     );
-    if (speed > 0.05) {
-      playAnimation('Running1');
-    } else {
+    // if (speed > 0.05) {
+      // playAnimation('Running1');
+    // } else {
       playAnimation('Walking');
-    }
+    // }
   } else {
     playAnimation('Idle');
   }
@@ -605,8 +606,20 @@ function animateCD(deltaTime) {
   }
 }
 
-function animate() {
+const targetFPS = 30;
+const frameTime = 1000 / targetFPS;
+let lastFrameTime = 0;
+
+function animate(currentTime) {
   requestAnimationFrame(animate);
+
+  if (!lastFrameTime) lastFrameTime = currentTime;
+
+  const deltaTime = currentTime - lastFrameTime;
+  if (deltaTime < frameTime) return;
+
+  lastFrameTime = currentTime;
+
   const delta = clock.getDelta();
 
   if (mixer) mixer.update(delta);
@@ -615,9 +628,11 @@ function animate() {
     handlePlayerMovement();
     updateCamera();
   }
-  
+
   composer.render();
 }
+
+requestAnimationFrame(animate);
 
 // Обработчик клика для разблокировки аудио
 document.addEventListener('click', () => {
@@ -656,9 +671,3 @@ if (window.Telegram && Telegram.WebApp) {
     }
   });
 }
-
-console.log("DitherShader status:", {
-  uniforms: DitherShader.uniforms,
-  compiled: DitherShader.fragmentShader.includes("dither4x4")
-});
-console.log("Composer passes:", composer.passes.map(p => p.name || p.constructor.name));
