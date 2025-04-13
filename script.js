@@ -31,9 +31,96 @@ function updateCamera() {
   camera.lookAt(player.position.x, player.position.y, player.position.z);
 }
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({
+  antialias: false, // Отключаем сглаживание
+  powerPreference: "low-power" // Эмулируем слабый GPU
+});
+renderer.setPixelRatio(1); // Фиксируем пиксельное соотношение
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
+
+const DitherShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+    pixelSize: { value: 1 } // Увеличиваем для более заметного эффекта
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform vec2 resolution;
+    uniform float pixelSize;
+    varying vec2 vUv;
+    
+    // Улучшенный алгоритм дизеринга
+    float bayer2x2(vec2 coord) {
+      coord = mod(coord, 2.0);
+      return coord.x + coord.y * 0.5;
+    }
+    
+    void main() {
+      // Понижаем разрешение
+      vec2 pixelCoord = floor(vUv * resolution / pixelSize) * pixelSize;
+      vec2 uv = pixelCoord / resolution;
+      
+      vec4 color = texture2D(tDiffuse, uv);
+      
+      // Применяем дизеринг
+      float threshold = bayer2x2(gl_FragCoord.xy / pixelSize);
+      float ditherAmount = 0.5; // от 0 (нет дизеринга) до 1 (максимум)
+      vec3 quantized = floor(color.rgb * 4.0 + threshold * ditherAmount) / 4.0;
+      
+      gl_FragColor = vec4(quantized, color.a);
+    }
+  `
+};
+
+let composer;
+
+function initPostProcessing() {
+  // 1. Создаём рендер-таргет для композитора
+  const renderTarget = new THREE.WebGLRenderTarget(
+    window.innerWidth,
+    window.innerHeight,
+    {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.NearestFilter, // Важно для пиксельного вида
+      format: THREE.RGBAFormat
+    }
+  );
+
+  // 2. Инициализируем композитор с этим таргетом
+  composer = new THREE.EffectComposer(renderer, renderTarget);
+
+  // 3. Создаём и добавляем RenderPass
+  const renderPass = new THREE.RenderPass(scene, camera);
+  composer.addPass(renderPass);
+
+  // 4. Создаём и настраиваем ShaderPass
+  const ditherPass = new THREE.ShaderPass(DitherShader);
+  ditherPass.renderToScreen = true;
+  composer.addPass(ditherPass);
+
+  // 5. Вручную устанавливаем текстуру для шейдера
+  DitherShader.uniforms.tDiffuse.value = renderTarget.texture;
+  DitherShader.uniforms.resolution.value.set(
+    window.innerWidth, 
+    window.innerHeight
+  );
+
+  // 6. Принудительный первый рендер
+  composer.render();
+}
+
+initPostProcessing();
 
 const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(1, 1, 1);
@@ -104,13 +191,6 @@ fbxLoader.load(
     createFallbackPlayer();
   }
 );
-
-function loadAnimation(name, path) {
-  fbxLoader.load(path, (animFbx) => {
-    animations[name] = animFbx.animations[0];
-    console.log(`Анимация ${name} загружена`);
-  });
-}
 
 function loadAnimation(name, path) {
   fbxLoader.load(path, (animFbx) => {
@@ -312,6 +392,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  DitherShader.uniforms.resolution.value.set(window.innerWidth, window.innerHeight);
 });
 
 const joystickData = {
@@ -534,8 +615,8 @@ function animate() {
     handlePlayerMovement();
     updateCamera();
   }
-
-  renderer.render(scene, camera);
+  
+  composer.render();
 }
 
 // Обработчик клика для разблокировки аудио
@@ -575,3 +656,9 @@ if (window.Telegram && Telegram.WebApp) {
     }
   });
 }
+
+console.log("DitherShader status:", {
+  uniforms: DitherShader.uniforms,
+  compiled: DitherShader.fragmentShader.includes("dither4x4")
+});
+console.log("Composer passes:", composer.passes.map(p => p.name || p.constructor.name));
