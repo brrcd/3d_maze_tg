@@ -4,6 +4,28 @@ const clock = new THREE.Clock();
 const audioListener = new THREE.AudioListener();
 scene.background = new THREE.Color(0x87CEEB);
 
+const gltfLoader = new THREE.GLTFLoader();
+
+gltfLoader.load(
+  'assets/levels/starting_room.glb',
+  (gltf) => {
+    // Добавляем всю сцену
+    scene.add(gltf.scene);
+    
+    // Отладочная информация
+    console.log('GLTF загружен:', gltf);
+    gltf.scene.traverse(child => {
+      console.log(child.name || child.type, child.position);
+    });
+  },
+  (xhr) => {
+    console.log((xhr.loaded / xhr.total * 100) + '% загружено');
+  },
+  (error) => {
+    console.error('Ошибка загрузки GLTF:', error);
+  }
+);
+
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.add(audioListener);
 const cameraDistance = 5;
@@ -238,7 +260,7 @@ const floor = new THREE.Mesh(
 );
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
-scene.add(floor);
+// scene.add(floor);
 
 const walls = [];
 const basicMaterial = new THREE.MeshStandardMaterial({
@@ -274,9 +296,9 @@ const wallPositions = [
 
 wallPositions.forEach(pos => {
   const wall = new THREE.Mesh(wallGeometry, wallMaterials);
-  wall.position.set(pos.x, 1, pos.z);
-  scene.add(wall);
-  walls.push(wall);
+  // wall.position.set(pos.x, 1, pos.z);
+  // scene.add(wall);
+  // walls.push(wall);
 });
 
 function checkCollision(position) {
