@@ -40,6 +40,47 @@ audioLoader.load('assets/audio/music/platformer_1_underscore_modern.wav', functi
   sound.setVolume(0.001);
 });
 
+const stepSounds = [];
+let currentStepSound = 0;
+let stepSoundInterval = null;
+let lastStepTime = 0;
+
+function loadStepSounds() {
+  const stepSoundPaths = [
+    'assets/audio/steps/footstep1.wav',
+    'assets/audio/steps/footstep2.wav',
+    'assets/audio/steps/footstep3.wav',
+    'assets/audio/steps/footstep4.wav',
+  ];
+  
+  stepSoundPaths.forEach((path, index) => {
+    const stepSound = new THREE.Audio(audioListener);
+    audioLoader.load(path, function(buffer) {
+      stepSound.setBuffer(buffer);
+      stepSound.setVolume(0.3); // громкость
+      stepSounds[index] = stepSound;
+    });
+  });
+}
+
+loadStepSounds();
+
+function playRandomStepSound() {
+  if (stepSounds.length === 0) return;
+  
+  // Выбираем случайный звук шага
+  const randomIndex = Math.floor(Math.random() * stepSounds.length);
+  const stepSound = stepSounds[randomIndex];
+  
+  // Если звук загружен, воспроизводим
+  if (stepSound && stepSound.isPlaying) {
+    stepSound.stop();
+  }
+  if (stepSound) {
+    stepSound.play();
+  }
+}
+
 let cameraAngle = 0;
 const movementSpeed = 0.1;
 const rotationSpeed = 0.03;
@@ -398,13 +439,30 @@ function handlePlayerMovement() {
       moveVector.x,
       moveVector.z
     );
+    
     if (speed > 0.05) {
       playAnimation('Running1');
+      
+      // Бег
+      const now = Date.now();
+      if (now - lastStepTime > 330) { // Интервал между шагами (мс)
+        lastStepTime = now;
+        playRandomStepSound();
+      }
     } else {
       playAnimation('Walking');
+      
+      // Ходьба
+      const now = Date.now();
+      if (now - lastStepTime > 560) { // Больший интервал для ходьбы
+        lastStepTime = now;
+        playRandomStepSound();
+      }
     }
   } else {
     playAnimation('Idle');
+    // Остановить звуки шагов при остановке
+    lastStepTime = 0;
   }
 
   updateCamera();
