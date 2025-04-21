@@ -741,6 +741,9 @@ document.addEventListener('visibilitychange', () => {
     if (sound && sound.isPlaying) {
       sound.pause(); // пауза при сворачивании
     }
+    stepSounds.forEach(sound => {
+      if (sound && sound.isPlaying) sound.stop();
+    });
   }
 });
 
