@@ -7,24 +7,40 @@ scene.background = new THREE.Color(0x87CEEB);
 const gltfLoader = new THREE.GLTFLoader();
 
 gltfLoader.load(
-  'assets/levels/starting_room.glb',
+  'assets/levels/start_2.glb',
   (gltf) => {
-    // Добавляем всю сцену
     scene.add(gltf.scene);
-    
-    // Отладочная информация
-    console.log('GLTF загружен:', gltf);
-    gltf.scene.traverse(child => {
-      console.log(child.name || child.type, child.position);
-    });
   },
   (xhr) => {
-    console.log((xhr.loaded / xhr.total * 100) + '% загружено');
+    // console.log((xhr.loaded / xhr.total * 100) + '% загружено');
   },
   (error) => {
     console.error('Ошибка загрузки GLTF:', error);
   }
 );
+
+const collidableObjects = [];
+
+gltfLoader.load('assets/levels/start_2.glb', (gltf) => {
+  scene.add(gltf.scene);
+  
+  // Собираем коллизионные объекты
+  gltf.scene.traverse(child => {
+    if (child.userData?.isCollidable) {
+      child.box3 = new THREE.Box3().setFromObject(child);
+      collidableObjects.push(child);
+    }
+    if (child.name.includes('bed')) {
+      console.log('Checking collision with Bed');
+      console.log('Bed scale:', child.scale);
+      console.log(child.name, 'box3:', child.box3);
+    }
+  });
+
+  if (window.showCollisionDebug) {
+    createCollisionHelpers();
+  }
+});
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.add(audioListener);
@@ -248,7 +264,7 @@ fbxLoader.load(
     }
   },
   (xhr) => {
-    console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    // console.log((xhr.loaded / xhr.total * 100) + '% loaded');
   },
   (error) => {
     console.error('Error loading FBX:', error);
@@ -256,17 +272,49 @@ fbxLoader.load(
   }
 );
 
+// Добавляем в начало файла
+const collisionHelpers = []; // Массив для хранения визуализаций
+
+// Функция для создания визуализации коллизий
+function createCollisionHelpers() {
+  // Удаляем старые хелперы, если есть
+  removeCollisionHelpers();
+
+  collidableObjects.forEach(obj => {
+    if (obj.box3) {
+      // Создаем Box3Helper (зеленый проводной куб)
+      const helper = new THREE.Box3Helper(obj.box3, 0x00ff00);
+      scene.add(helper);
+      collisionHelpers.push(helper);
+      
+      // Для игрока создаем красный куб (если нужно)
+      if (obj.name.includes('player')) {
+        const playerHelper = new THREE.Box3Helper(obj.box3, 0xff0000);
+        scene.add(playerHelper);
+        collisionHelpers.push(playerHelper);
+      }
+    }
+  });
+}
+
+// Функция для удаления хелперов
+function removeCollisionHelpers() {
+  collisionHelpers.forEach(helper => {
+    scene.remove(helper);
+  });
+  collisionHelpers.length = 0;
+}
+
 function loadAnimation(name, path) {
   fbxLoader.load(path, (animFbx) => {
     animations[name] = animFbx.animations[0];
-    console.log(`Анимация ${name} загружена`);
+    // console.log(`Анимация ${name} загружена`);
   });
 }
 
 let lastAnimation = '';
 function playAnimation(name) {
   if (!animations[name] || !mixer) {
-    console.error(`Анимация "${name}" не загружена или mixer отсутствует`);
     return;
   }
   if (lastAnimation === name) return; // Не прерывать текущую анимацию
@@ -285,82 +333,35 @@ function playAnimation(name) {
   lastAnimation = name;
 }
 
-const groundTexture = textureLoader.load('assets/textures/Horror_Floor_12-128x128.png');
-groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
-groundTexture.repeat.set(10, 10);
-groundTexture.anisotropy = 16;
-const groundMaterial = new THREE.MeshStandardMaterial({
-  map: groundTexture,
-  roughness: 0.8,
-  metalness: 0.2
-});
-
-const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(20, 40),
-  groundMaterial
-);
-floor.rotation.x = -Math.PI / 2;
-floor.receiveShadow = true;
-// scene.add(floor);
-
-const walls = [];
-const basicMaterial = new THREE.MeshStandardMaterial({
-  color: 0x888888,
-  roughness: 0.8,
-  metalness: 0.2
-});
-
-const wallTexture = textureLoader.load('assets/textures/Horror_Brick_01-128x128.png');
-const wallMaterial = new THREE.MeshStandardMaterial({
-  map: wallTexture,
-  roughness: 1,
-  metalness: 0.2,
-  side: THREE.DoubleSide
-});
-wallMaterial.map.repeat.set(30, 2);
-wallMaterial.map.wrapS = THREE.RepeatWrapping;
-wallMaterial.map.wrapT = THREE.RepeatWrapping;
-const wallMaterials = [
-  wallMaterial, // Правая грань (x+)
-  wallMaterial,  // Левая грань (x-)
-  basicMaterial,  // Верхняя грань (y+)
-  basicMaterial,  // Нижняя грань (y-)
-  basicMaterial, // Передняя грань (z+)
-  basicMaterial  // Задняя грань (z-)
-];
-
-const wallGeometry = new THREE.BoxGeometry(1, 3, 30);
-
-const wallPositions = [
-  { x: 3, z: 0 }, { x: -3, z: 0 }
-];
-
-wallPositions.forEach(pos => {
-  const wall = new THREE.Mesh(wallGeometry, wallMaterials);
-  // wall.position.set(pos.x, 1, pos.z);
-  // scene.add(wall);
-  // walls.push(wall);
-});
-
 function checkCollision(position) {
   if (!playerReady) return { collision: false, slideVector: new THREE.Vector3() };
 
-  const playerSize = new THREE.Vector3(0.8, 1.5, 0.8); // Подберите под вашу модель
+  const playerSize = new THREE.Vector3(0.8, 1.5, 0.8);
   const playerBox = new THREE.Box3(
     new THREE.Vector3().copy(position).sub(playerSize),
     new THREE.Vector3().copy(position).add(playerSize)
   );
 
+  if (window.showCollisionDebug) {
+    const playerHelper = collisionHelpers.find(h => h.box === playerBox);
+    if (playerHelper) {
+      playerHelper.box.copy(playerBox);
+    }
+  }
+
   let collision = false;
   let slideVector = new THREE.Vector3();
 
-  walls.forEach(wall => {
-    const wallBox = new THREE.Box3().setFromObject(wall);
-    if (playerBox.intersectsBox(wallBox)) {
+  for (const child of collidableObjects) {
+    if (!child.box3) {
+      continue;
+    }
+    if (playerBox.intersectsBox(child.box3)) {
       collision = true;
       const overlap = new THREE.Vector3();
-      wallBox.getCenter(overlap).sub(position);
+      child.box3.getCenter(overlap).sub(position);
 
+      // Определяем направление "выталкивания"
       if (Math.abs(overlap.x) > Math.abs(overlap.z)) {
         overlap.z = 0;
       } else {
@@ -369,7 +370,7 @@ function checkCollision(position) {
 
       slideVector.add(overlap.normalize());
     }
-  });
+  }
 
   return {
     collision,
@@ -379,6 +380,7 @@ function checkCollision(position) {
 
 function handlePlayerMovement() {
   if (!playerReady) return;
+
   const direction = new THREE.Vector3();
   camera.getWorldDirection(direction);
   direction.y = 0;
@@ -399,30 +401,31 @@ function handlePlayerMovement() {
   }
 
   const newPosition = player.position.clone().add(moveVector);
-
   const { collision, slideVector } = checkCollision(newPosition);
 
   if (collision) {
-    const tryPosition = player.position.clone();
-
-    tryPosition.x = newPosition.x;
-    if (!checkCollision(tryPosition).collision) {
-      player.position.copy(tryPosition);
+    // Пробуем двигаться только по X
+    const tryX = player.position.clone();
+    tryX.x = newPosition.x;
+    if (!checkCollision(tryX).collision) {
+      player.position.x = tryX.x;
     }
 
-    tryPosition.copy(player.position);
-    tryPosition.z = newPosition.z;
-    if (!checkCollision(tryPosition).collision) {
-      player.position.copy(tryPosition);
+    // Пробуем двигаться только по Z
+    const tryZ = player.position.clone();
+    tryZ.z = newPosition.z;
+    if (!checkCollision(tryZ).collision) {
+      player.position.z = tryZ.z;
     }
 
-    if (moveVector.length() > 0) {
+    // Скольжение вдоль препятствий
+    if (moveVector.length() > 0.01) {
       const slideDirection = new THREE.Vector3()
         .crossVectors(slideVector, new THREE.Vector3(0, 1, 0))
         .normalize();
 
-      const slidePosition = player.position.clone()
-        .add(slideDirection.multiplyScalar(moveVector.dot(slideDirection)));
+      const slideMove = slideDirection.multiplyScalar(moveVector.dot(slideDirection));
+      const slidePosition = player.position.clone().add(slideMove);
 
       if (!checkCollision(slidePosition).collision) {
         player.position.copy(slidePosition);
@@ -432,36 +435,26 @@ function handlePlayerMovement() {
     player.position.copy(newPosition);
   }
 
+  // Анимация и звуки шагов
   if (moveVector.length() > 0) {
     const speed = moveVector.length();
-    
-    player.rotation.y = Math.atan2(
-      moveVector.x,
-      moveVector.z
-    );
+    player.rotation.y = Math.atan2(moveVector.x, moveVector.z);
     
     if (speed > 0.05) {
       playAnimation('Running1');
-      
-      // Бег
-      const now = Date.now();
-      if (now - lastStepTime > 330) { // Интервал между шагами (мс)
-        lastStepTime = now;
+      if (Date.now() - lastStepTime > 330) {
+        lastStepTime = Date.now();
         playRandomStepSound();
       }
     } else {
       playAnimation('Walking');
-      
-      // Ходьба
-      const now = Date.now();
-      if (now - lastStepTime > 560) { // Больший интервал для ходьбы
-        lastStepTime = now;
+      if (Date.now() - lastStepTime > 560) {
+        lastStepTime = Date.now();
         playRandomStepSound();
       }
     }
   } else {
     playAnimation('Idle');
-    // Остановить звуки шагов при остановке
     lastStepTime = 0;
   }
 
@@ -754,3 +747,15 @@ if (window.Telegram && Telegram.WebApp) {
     }
   });
 }
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'F1') {
+    window.showCollisionDebug = !window.showCollisionDebug;
+    if (window.showCollisionDebug) {
+      createCollisionHelpers();
+    } else {
+      removeCollisionHelpers();
+    }
+    console.log('Collision debug:', window.showCollisionDebug ? 'ON' : 'OFF');
+  }
+});
