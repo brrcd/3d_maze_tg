@@ -6,6 +6,13 @@ scene.background = new THREE.Color(0x87CEEB);
 
 const gltfLoader = new THREE.GLTFLoader();
 
+const keyboardState = {
+  KeyW: false, // вперед
+  KeyA: false, // влево
+  KeyS: false, // назад
+  KeyD: false  // вправо
+};
+
 gltfLoader.load(
   'assets/levels/start_2.glb',
   (gltf) => {
@@ -23,7 +30,7 @@ const collidableObjects = [];
 
 gltfLoader.load('assets/levels/start_2.glb', (gltf) => {
   scene.add(gltf.scene);
-  
+
   // Собираем коллизионные объекты
   gltf.scene.traverse(child => {
     if (child.userData?.isCollidable) {
@@ -72,10 +79,10 @@ function loadStepSounds() {
     'assets/audio/steps/step_wood_7.ogg',
     'assets/audio/steps/step_wood_8.ogg'
   ];
-  
+
   stepSoundPaths.forEach((path, index) => {
     const stepSound = new THREE.Audio(audioListener);
-    audioLoader.load(path, function(buffer) {
+    audioLoader.load(path, function (buffer) {
       stepSound.setBuffer(buffer);
       stepSound.setVolume(0.3); // громкость
       stepSounds[index] = stepSound;
@@ -87,11 +94,11 @@ loadStepSounds();
 
 function playRandomStepSound() {
   if (stepSounds.length === 0) return;
-  
+
   // Выбираем случайный звук шага
   const randomIndex = Math.floor(Math.random() * stepSounds.length);
   const stepSound = stepSounds[randomIndex];
-  
+
   // Если звук загружен, воспроизводим
   if (stepSound && stepSound.isPlaying) {
     stepSound.stop();
@@ -196,7 +203,7 @@ function initPostProcessing() {
   // 5. Вручную устанавливаем текстуру для шейдера
   DitherShader.uniforms.tDiffuse.value = renderTarget.texture;
   DitherShader.uniforms.resolution.value.set(
-    window.innerWidth, 
+    window.innerWidth,
     window.innerHeight
   );
 
@@ -290,7 +297,7 @@ function createCollisionHelpers() {
       const helper = new THREE.Box3Helper(obj.box3, 0x00ff00);
       scene.add(helper);
       collisionHelpers.push(helper);
-      
+
       // Для игрока создаем красный куб (если нужно)
       if (obj.name.includes('player')) {
         const playerHelper = new THREE.Box3Helper(obj.box3, 0xff0000);
@@ -385,81 +392,68 @@ function checkCollision(position) {
 function handlePlayerMovement() {
   if (!playerReady) return;
 
-  const direction = new THREE.Vector3();
-  camera.getWorldDirection(direction);
-  direction.y = 0;
-  direction.normalize();
+  // Получаем направление камеры (без учета наклона по Y)
+  const cameraDirection = new THREE.Vector3();
+  camera.getWorldDirection(cameraDirection);
+  cameraDirection.y = 0;
+  cameraDirection.normalize();
 
-  const right = new THREE.Vector3();
-  right.crossVectors(new THREE.Vector3(0, 1, 0), direction).normalize();
-
+  // Вектор движения (изначально нулевой)
   const moveVector = new THREE.Vector3();
 
+  // Управление WASD (относительно камеры)
+
+  if (keyboardState.KeyW) moveVector.add(cameraDirection); // Вперед
+  if (keyboardState.KeyS) moveVector.sub(cameraDirection); // Назад
+
+  // Боковое движение (перпендикулярно направлению камеры)
+  const cameraRight = new THREE.Vector3();
+  cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraDirection).normalize();
+
+  if (keyboardState.KeyA) moveVector.add(cameraRight);     // Влево
+  if (keyboardState.KeyD) moveVector.sub(cameraRight);     // Вправо
+
+  // Управление левым стиком (аналогично WASD)
   if (joystickData.left.active) {
-    moveVector.add(direction.multiplyScalar(joystickData.left.y * movementSpeed));
-    moveVector.add(right.multiplyScalar(-joystickData.left.x * movementSpeed));
+    // Вперед/назад по оси Y джойстика
+    moveVector.add(cameraDirection.clone().multiplyScalar(joystickData.left.y));
+    // Влево/вправо по оси X джойстика
+    moveVector.add(cameraRight.clone().multiplyScalar(-joystickData.left.x));
   }
 
-  if (joystickData.right.active) {
-    cameraAngle += joystickData.right.x * rotationSpeed * 2;
-  }
-
-  const newPosition = player.position.clone().add(moveVector);
-  const { collision, slideVector } = checkCollision(newPosition);
-
-  if (collision) {
-    // Пробуем двигаться только по X
-    const tryX = player.position.clone();
-    tryX.x = newPosition.x;
-    if (!checkCollision(tryX).collision) {
-      player.position.x = tryX.x;
-    }
-
-    // Пробуем двигаться только по Z
-    const tryZ = player.position.clone();
-    tryZ.z = newPosition.z;
-    if (!checkCollision(tryZ).collision) {
-      player.position.z = tryZ.z;
-    }
-
-    // Скольжение вдоль препятствий
-    if (moveVector.length() > 0.01) {
-      const slideDirection = new THREE.Vector3()
-        .crossVectors(slideVector, new THREE.Vector3(0, 1, 0))
-        .normalize();
-
-      const slideMove = slideDirection.multiplyScalar(moveVector.dot(slideDirection));
-      const slidePosition = player.position.clone().add(slideMove);
-
-      if (!checkCollision(slidePosition).collision) {
-        player.position.copy(slidePosition);
-      }
-    }
-  } else {
-    player.position.copy(newPosition);
-  }
-
-  // Анимация и звуки шагов
+  // Нормализуем вектор, если это диагональ (чтобы скорость была одинаковая)
   if (moveVector.length() > 0) {
-    const speed = moveVector.length();
-    player.rotation.y = Math.atan2(moveVector.x, moveVector.z);
-    
-    if (speed > 0.05) {
-      playAnimation('Running1');
-      if (Date.now() - lastStepTime > 330) {
-        lastStepTime = Date.now();
-        playRandomStepSound();
-      }
-    } else {
-      playAnimation('Walking');
-      if (Date.now() - lastStepTime > 560) {
-        lastStepTime = Date.now();
-        playRandomStepSound();
-      }
+    moveVector.normalize().multiplyScalar(movementSpeed);
+  }
+
+  // Применяем движение
+  if (moveVector.length() > 0) {
+    const newPosition = player.position.clone().add(moveVector);
+    const { collision } = checkCollision(newPosition);
+
+    if (!collision) {
+      player.position.copy(newPosition);
+    }
+
+    // Поворачиваем персонажа в сторону движения (если двигается)
+    if (moveVector.length() > 0.01) {
+      player.rotation.y = Math.atan2(moveVector.x, moveVector.z);
+    }
+
+    // Анимация и звуки шагов
+    playAnimation('Running1');
+    if (Date.now() - lastStepTime > 330) {
+      lastStepTime = Date.now();
+      playRandomStepSound();
     }
   } else {
     playAnimation('Idle');
     lastStepTime = 0;
+  }
+
+  // Вращение камеры правым стиком
+  if (joystickData.right.active) {
+    cameraAngle += joystickData.right.x * rotationSpeed * 2;
   }
 
   updateCamera();
@@ -761,5 +755,21 @@ document.addEventListener('keydown', (e) => {
       removeCollisionHelpers();
     }
     console.log('Collision debug:', window.showCollisionDebug ? 'ON' : 'OFF');
+  }
+});
+
+// Обработка нажатий (по скан-кодам)
+document.addEventListener('keydown', (e) => {
+  if (e.code in keyboardState) {
+    keyboardState[e.code] = true;
+    e.preventDefault();
+  }
+});
+
+// Обработка отпусканий (по скан-кодам)
+document.addEventListener('keyup', (e) => {
+  if (e.code in keyboardState) {
+    keyboardState[e.code] = false;
+    e.preventDefault();
   }
 });
