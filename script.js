@@ -63,10 +63,14 @@ let lastStepTime = 0;
 
 function loadStepSounds() {
   const stepSoundPaths = [
-    'assets/audio/steps/footstep1.wav',
-    'assets/audio/steps/footstep2.wav',
-    'assets/audio/steps/footstep3.wav',
-    'assets/audio/steps/footstep4.wav',
+    'assets/audio/steps/step_wood_1.ogg',
+    'assets/audio/steps/step_wood_2.ogg',
+    'assets/audio/steps/step_wood_3.ogg',
+    'assets/audio/steps/step_wood_4.ogg',
+    'assets/audio/steps/step_wood_5.ogg',
+    'assets/audio/steps/step_wood_6.ogg',
+    'assets/audio/steps/step_wood_7.ogg',
+    'assets/audio/steps/step_wood_8.ogg'
   ];
   
   stepSoundPaths.forEach((path, index) => {
