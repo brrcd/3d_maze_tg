@@ -112,13 +112,61 @@ let cameraAngle = 0;
 const movementSpeed = 0.1;
 const rotationSpeed = 0.03;
 
-function updateCamera() {
-  if (!playerReady) return; // Не обновляем камеру без игрока
+// Добавляем в начало файла
+const cameraTargetPosition = new THREE.Vector3();
+let currentCameraDistance = cameraDistance; // Текущее расстояние камеры (для плавности)
 
-  const camX = player.position.x + Math.sin(cameraAngle) * cameraDistance;
-  const camZ = player.position.z + Math.cos(cameraAngle) * cameraDistance;
-  camera.position.set(camX, player.position.y + cameraHeight, camZ);
-  camera.lookAt(player.position.x, player.position.y, player.position.z);
+function updateCamera() {
+  if (!playerReady) return;
+
+  // 1. Вычисляем желаемую позицию камеры без учёта препятствий
+  const desiredCamX = player.position.x + Math.sin(cameraAngle) * cameraDistance;
+  const desiredCamZ = player.position.z + Math.cos(cameraAngle) * cameraDistance;
+  cameraTargetPosition.set(
+    desiredCamX,
+    player.position.y + cameraHeight,
+    desiredCamZ
+  );
+
+  // 2. Проверяем коллизии камеры с окружением
+  const raycaster = new THREE.Raycaster();
+  raycaster.set(
+    player.position,
+    cameraTargetPosition.clone().sub(player.position).normalize()
+  );
+
+  // Фильтруем только коллизионные объекты (стены, но не двери)
+  const walls = collidableObjects.filter(obj => 
+    obj.userData.isCollidable && !obj.userData.isDoor
+  );
+
+  const intersects = raycaster.intersectObjects(walls, true);
+  let targetDistance = cameraDistance;
+
+  // Если есть препятствие - уменьшаем расстояние
+  if (intersects.length > 0 && intersects[0].distance < cameraDistance) {
+    targetDistance = Math.max(1, intersects[0].distance - 0.5); // Минимальная дистанция = 1
+  }
+
+  // 3. Плавно изменяем текущее расстояние (Lerp)
+  currentCameraDistance = THREE.MathUtils.lerp(
+    currentCameraDistance,
+    targetDistance,
+    0.1 // Коэффициент плавности (0.1 = медленно, 0.5 = быстро)
+  );
+
+  // 4. Финальная позиция камеры с плавностью и коллизиями
+  const smoothCamX = player.position.x + Math.sin(cameraAngle) * currentCameraDistance;
+  const smoothCamZ = player.position.z + Math.cos(cameraAngle) * currentCameraDistance;
+  
+  // Плавное перемещение камеры (Lerp)
+  camera.position.lerp(
+    new THREE.Vector3(smoothCamX, player.position.y + cameraHeight, smoothCamZ),
+    0.2 // Коэффициент плавности движения
+  );
+
+  // Камера всегда смотрит на игрока
+  camera.lookAt(player.position.x, player.position.y + 1, player.position.z); // +1 чтобы смотреть не в ноги
 }
 
 const renderer = new THREE.WebGLRenderer({
