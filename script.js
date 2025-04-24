@@ -441,44 +441,68 @@ function handlePlayerMovement() {
   cameraDirection.y = 0;
   cameraDirection.normalize();
 
+  // Боковое направление (перпендикулярно камере)
+  const cameraRight = new THREE.Vector3();
+  cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraDirection).normalize();
+
   // Вектор движения (изначально нулевой)
   const moveVector = new THREE.Vector3();
 
   // Управление WASD (относительно камеры)
-
   if (keyboardState.KeyW) moveVector.add(cameraDirection); // Вперед
   if (keyboardState.KeyS) moveVector.sub(cameraDirection); // Назад
-
-  // Боковое движение (перпендикулярно направлению камеры)
-  const cameraRight = new THREE.Vector3();
-  cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraDirection).normalize();
-
   if (keyboardState.KeyA) moveVector.add(cameraRight);     // Влево
   if (keyboardState.KeyD) moveVector.sub(cameraRight);     // Вправо
 
   // Управление левым стиком (аналогично WASD)
   if (joystickData.left.active) {
-    // Вперед/назад по оси Y джойстика
     moveVector.add(cameraDirection.clone().multiplyScalar(joystickData.left.y));
-    // Влево/вправо по оси X джойстика
     moveVector.add(cameraRight.clone().multiplyScalar(-joystickData.left.x));
   }
 
-  // Нормализуем вектор, если это диагональ (чтобы скорость была одинаковая)
+  // Нормализуем вектор, если это диагональ
   if (moveVector.length() > 0) {
     moveVector.normalize().multiplyScalar(movementSpeed);
   }
 
-  // Применяем движение
+  // Применяем движение с учетом коллизий и скольжения
   if (moveVector.length() > 0) {
     const newPosition = player.position.clone().add(moveVector);
-    const { collision } = checkCollision(newPosition);
+    const { collision, slideVector } = checkCollision(newPosition);
 
-    if (!collision) {
+    if (collision) {
+      // Пробуем двигаться только по X
+      const tryX = player.position.clone();
+      tryX.x = newPosition.x;
+      if (!checkCollision(tryX).collision) {
+        player.position.x = tryX.x;
+      }
+
+      // Пробуем двигаться только по Z
+      const tryZ = player.position.clone();
+      tryZ.z = newPosition.z;
+      if (!checkCollision(tryZ).collision) {
+        player.position.z = tryZ.z;
+      }
+
+      // Скольжение вдоль препятствия
+      if (slideVector.length() > 0.01) {
+        const slideDirection = new THREE.Vector3()
+          .crossVectors(slideVector, new THREE.Vector3(0, 1, 0))
+          .normalize();
+
+        const slideMove = slideDirection.multiplyScalar(moveVector.dot(slideDirection));
+        const slidePosition = player.position.clone().add(slideMove);
+
+        if (!checkCollision(slidePosition).collision) {
+          player.position.copy(slidePosition);
+        }
+      }
+    } else {
       player.position.copy(newPosition);
     }
 
-    // Поворачиваем персонажа в сторону движения (если двигается)
+    // Поворот персонажа в сторону движения
     if (moveVector.length() > 0.01) {
       player.rotation.y = Math.atan2(moveVector.x, moveVector.z);
     }
