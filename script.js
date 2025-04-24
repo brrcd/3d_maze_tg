@@ -37,11 +37,6 @@ gltfLoader.load('assets/levels/start_2.glb', (gltf) => {
       child.box3 = new THREE.Box3().setFromObject(child);
       collidableObjects.push(child);
     }
-    if (child.name.includes('bed')) {
-      console.log('Checking collision with Bed');
-      console.log('Bed scale:', child.scale);
-      console.log(child.name, 'box3:', child.box3);
-    }
   });
 
   if (window.showCollisionDebug) {
