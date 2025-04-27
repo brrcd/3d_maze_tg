@@ -16,6 +16,7 @@ const keyboardState = {
 
 const collidableObjects = [];
 const interactableObjects = [];
+const doors = [];
 
 gltfLoader.load('assets/levels/start_3.glb', (gltf) => {
   scene.add(gltf.scene);
@@ -28,6 +29,11 @@ gltfLoader.load('assets/levels/start_3.glb', (gltf) => {
 
     if (child.userData?.isInteractable) {
       interactableObjects.push(child);
+    }
+
+    if (child.userData?.isDoor) {
+      doors.push(child);
+      child.userData.isInteractable = true;
     }
   });
 
@@ -676,8 +682,10 @@ function setupJoystick(joystickElement, type) {
 
 initJoysticks();
 
+let currentInteractable = null; // Глобальная переменная
+
 function checkInteractableProximity() {
-  if (!playerReady) return false;
+  if (!playerReady) return null;
 
   let closestDistance = Infinity;
   let closestObject = null;
@@ -691,6 +699,7 @@ function checkInteractableProximity() {
   });
 
   const isClose = closestDistance < 2.5;
+  currentInteractable = isClose ? closestObject : null;
 
   if (isClose) {
     actionButton.style.background = 'rgba(255, 255, 255, 0.8)';
@@ -735,6 +744,31 @@ function tweenVolumeTo(targetVolume, speed = 0.05) {
 const targetFPS = 120;
 const frameTime = 1000 / targetFPS;
 let lastFrameTime = 0;
+
+function openDoor(door) {
+  if (door.userData.isOpened) return; // Уже открыта
+
+  door.userData.isOpened = true;
+
+  // Плавная анимация открытия (например, поворот вокруг оси Y)
+  const duration = 1000; // мс
+  const startRotation = door.rotation.y;
+  const targetRotation = startRotation + Math.PI / 2; // на 90 градусов
+
+  const startTime = Date.now();
+
+  function animateDoor() {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    door.rotation.y = startRotation + (targetRotation - startRotation) * progress;
+
+    if (progress < 1) {
+      requestAnimationFrame(animateDoor);
+    }
+  }
+
+  animateDoor();
+}
 
 function animate(currentTime) {
   requestAnimationFrame(animate);
@@ -826,5 +860,14 @@ document.addEventListener('keyup', (e) => {
   if (e.code in keyboardState) {
     keyboardState[e.code] = false;
     e.preventDefault();
+  }
+});
+
+actionButton.addEventListener('click', () => {
+  if (!currentInteractable) return;
+
+  // Если это дверь
+  if (currentInteractable.userData.isDoor) {
+    openDoor(currentInteractable);
   }
 });

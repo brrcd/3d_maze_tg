@@ -73,6 +73,7 @@ body {
 }
 
 #action-button {
+  pointer-events: auto;
   position: fixed;
   bottom: 120px; /* чуть выше правого джойстика */
   right: 50px;
@@ -86,7 +87,6 @@ body {
   font-size: 18px;
   color: white;
   font-weight: bold;
-  pointer-events: none; /* чтобы не мешала джойстику */
   z-index: 200;
   transition: background 0.3s, transform 0.3s;
 }
