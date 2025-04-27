@@ -774,10 +774,10 @@ function toggleDoor(door) {
   const hingePosition = new THREE.Vector3();
   hingePosition.copy(startPosition);
   hingePosition.x = isClosed ? hingePosition.x + offset : hingePosition.x;
-  hingePosition.z = isClosed ? hingePosition.z : hingePosition.z - offset;
+  hingePosition.z = isClosed ? hingePosition.z : hingePosition.z + offset;
 
   const angle = Math.PI / 2;
-  const direction = isLeftHanded ? -1 : 1;
+  const direction = isLeftHanded ? 1 : -1;
   const targetRotation = isClosed
     ? startRotation + direction * angle
     : startRotation - direction * angle;
@@ -785,11 +785,11 @@ function toggleDoor(door) {
   targetPosition.copy(startPosition);
   if (!isClosed) {
     targetPosition.x -= offset;
-    targetPosition.z -= offset;
+    targetPosition.z += offset;
   }
   else {
     targetPosition.x += offset;
-    targetPosition.z += offset;
+    targetPosition.z -= offset;
   }
 
   const startTime = Date.now();
