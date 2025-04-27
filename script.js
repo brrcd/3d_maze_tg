@@ -76,6 +76,35 @@ function loadLevel() {
   });
 }
 
+// Звуки дверей
+const doorSounds = {
+  open: null,
+  close: null
+};
+
+function loadDoorSounds() {
+  const audioLoader = new THREE.AudioLoader();
+
+  // Загрузка звука открытия двери
+  audioLoader.load('assets/audio/door/door_open.mp3', function (buffer) {
+    const openSound = new THREE.Audio(audioListener);
+    openSound.setBuffer(buffer);
+    openSound.setVolume(0.5); // Громкость
+    doorSounds.open = openSound;
+  });
+
+  // Загрузка звука закрытия двери
+  audioLoader.load('assets/audio/door/door_close.mp3', function (buffer) {
+    const closeSound = new THREE.Audio(audioListener);
+    closeSound.setBuffer(buffer);
+    closeSound.setVolume(0.5); // Громкость
+    doorSounds.close = closeSound;
+  });
+}
+
+// Вызов загрузки звуков
+loadDoorSounds();
+
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.add(audioListener);
 const cameraDistance = 5;
@@ -794,7 +823,7 @@ function toggleDoor(door) {
 
   const isClosed = door.userData.isClosed;
   const isLeftHanded = door.userData.isLeftHanded;
-  const duration = 1000; // мс
+  const duration = isClosed ? 1000 : 300; // мс
 
   // Сохраняем начальные значения
   const startRotation = door.rotation.y;
@@ -822,6 +851,13 @@ function toggleDoor(door) {
   else {
     targetPosition.x += offset;
     targetPosition.z -= offset;
+  }
+
+  // Воспроизводим звук в начале анимации
+  if (isClosed && doorSounds.open) {
+    doorSounds.open.play(); // Звук открытия
+  } else if (!isClosed && doorSounds.close) {
+    doorSounds.close.play(); // Звук закрытия
   }
 
   const startTime = Date.now();
