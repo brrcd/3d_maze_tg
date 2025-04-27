@@ -28,6 +28,16 @@ let levelLoaded = false; // Флаг для отслеживания загру�
 startButton.addEventListener('click', () => {
   if (!levelLoaded) {
     loadLevel(); // Загружаем уровень
+    setControlListeners();
+    levelLoaded = true; // Отмечаем, что уровень загружен
+  }
+  startScreen.style.display = 'none'; // Скрываем стартовый экран
+});
+
+startButton.addEventListener('touchstart', (e) => {
+  if (!levelLoaded) {
+    loadLevel(); // Загружаем уровень
+    setControlListeners();
     levelLoaded = true; // Отмечаем, что уровень загружен
   }
   startScreen.style.display = 'none'; // Скрываем стартовый экран
@@ -919,21 +929,6 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Обработка нажатий (по скан-кодам)
-document.addEventListener('keydown', (e) => {
-  if (e.code in keyboardState) {
-    keyboardState[e.code] = true;
-    e.preventDefault();
-  }
-});
-
-// Обработка отпусканий (по скан-кодам)
-document.addEventListener('keyup', (e) => {
-  if (e.code in keyboardState) {
-    keyboardState[e.code] = false;
-    e.preventDefault();
-  }
-});
 
 function handleAction() {
   if (!currentInteractable) return;
@@ -943,15 +938,33 @@ function handleAction() {
   }
 }
 
-// Обработка кликов мыши
-actionButton.addEventListener('click', handleAction);
-
-// Обработка касаний (touch)
-actionButton.addEventListener('touchstart', (e) => {
-  e.preventDefault(); // Предотвращаем стандартное поведение
-  handleAction();
-});
-
 function easeOutQuad(t) {
   return t * (2 - t);
+}
+
+function setControlListeners() {
+  // Обработка нажатий (по скан-кодам)
+  document.addEventListener('keydown', (e) => {
+    if (e.code in keyboardState) {
+      keyboardState[e.code] = true;
+      e.preventDefault();
+    }
+  });
+
+  // Обработка отпусканий (по скан-кодам)
+  document.addEventListener('keyup', (e) => {
+    if (e.code in keyboardState) {
+      keyboardState[e.code] = false;
+      e.preventDefault();
+    }
+  });
+
+  // Обработка кликов мыши
+  actionButton.addEventListener('click', handleAction);
+
+  // Обработка касаний (touch)
+  actionButton.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // Предотвращаем стандартное поведение
+    handleAction();
+  });
 }

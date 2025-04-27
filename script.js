@@ -35,6 +35,7 @@ startButton.addEventListener('click', () => {
 });
 
 startButton.addEventListener('touchstart', (e) => {
+  e.preventDefault();
   if (!levelLoaded) {
     loadLevel(); // Загружаем уровень
     setControlListeners();

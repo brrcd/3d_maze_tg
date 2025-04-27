@@ -121,6 +121,8 @@ body {
   border-radius: 5px;
   cursor: pointer;
   transition: background 0.3s;
+  pointer-events: auto;
+  touch-action: auto;
 }
 
 #start-button:hover {
