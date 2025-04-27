@@ -34,6 +34,8 @@ gltfLoader.load('assets/levels/start_3.glb', (gltf) => {
     if (child.userData?.isDoor) {
       doors.push(child);
       child.userData.isInteractable = true;
+      child.userData.isClosed = true;
+      collidableObjects.push(child);
     }
   });
 
@@ -387,43 +389,52 @@ function playAnimation(name) {
 
 function checkCollision(position) {
   if (!playerReady) return { collision: false, slideVector: new THREE.Vector3() };
-
+  
   const playerSize = new THREE.Vector3(0.8, 1.5, 0.8);
   const playerBox = new THREE.Box3(
     new THREE.Vector3().copy(position).sub(playerSize),
     new THREE.Vector3().copy(position).add(playerSize)
   );
-
+  
   if (window.showCollisionDebug) {
     const playerHelper = collisionHelpers.find(h => h.box === playerBox);
     if (playerHelper) {
       playerHelper.box.copy(playerBox);
     }
   }
-
+  
   let collision = false;
   let slideVector = new THREE.Vector3();
-
+  
   for (const child of collidableObjects) {
-    if (!child.box3) {
-      continue;
-    }
-    if (playerBox.intersectsBox(child.box3)) {
-      collision = true;
-      const overlap = new THREE.Vector3();
-      child.box3.getCenter(overlap).sub(position);
-
-      // Определяем направление "выталкивания"
-      if (Math.abs(overlap.x) > Math.abs(overlap.z)) {
-        overlap.z = 0;
-      } else {
-        overlap.x = 0;
+    // Проверяем, является ли объект дверью и закрыта ли она
+    const isClosedDoor = child.userData.isDoor && child.userData.isClosed;
+    
+    // Если это закрытая дверь или обычный коллизионный объект
+    if ((child.userData.isCollidable && !child.userData.isDoor) || isClosedDoor) {
+      if (!child.box3) {
+        child.box3 = new THREE.Box3().setFromObject(child); // Создаем bounding box если его нет
       }
-
-      slideVector.add(overlap.normalize());
+      
+      if (playerBox.intersectsBox(child.box3)) {
+        collision = true;
+        
+        // Вычисляем вектор "выталкивания"
+        const overlap = new THREE.Vector3();
+        child.box3.getCenter(overlap).sub(position);
+        
+        // Определяем направление "выталкивания"
+        if (Math.abs(overlap.x) > Math.abs(overlap.z)) {
+          overlap.z = 0;
+        } else {
+          overlap.x = 0;
+        }
+        
+        slideVector.add(overlap.normalize());
+      }
     }
   }
-
+  
   return {
     collision,
     slideVector: slideVector.normalize()
@@ -762,8 +773,8 @@ function toggleDoor(door) {
 
   const hingePosition = new THREE.Vector3();
   hingePosition.copy(startPosition);
-  hingePosition.x = isClosed ? hingePosition.x : hingePosition.x += offset;
-  hingePosition.z = isClosed ? hingePosition.z + offset : hingePosition.z;
+  hingePosition.x = isClosed ? hingePosition.x + offset : hingePosition.x;
+  hingePosition.z = isClosed ? hingePosition.z : hingePosition.z - offset;
 
   const angle = Math.PI / 2;
   const direction = isLeftHanded ? -1 : 1;
@@ -772,15 +783,14 @@ function toggleDoor(door) {
     : startRotation - direction * angle;
   const targetPosition = new THREE.Vector3();
   targetPosition.copy(startPosition);
-  if (isClosed) {
+  if (!isClosed) {
     targetPosition.x -= offset;
-    targetPosition.z += offset;
+    targetPosition.z -= offset;
   }
   else {
     targetPosition.x += offset;
-    targetPosition.z -= offset;
+    targetPosition.z += offset;
   }
-  console.log("target position " + targetPosition);
 
   const startTime = Date.now();
 
