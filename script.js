@@ -131,7 +131,7 @@ function updateCamera() {
   );
 
   // Фильтруем только коллизионные объекты (стены, но не двери)
-  const walls = collidableObjects.filter(obj => 
+  const walls = collidableObjects.filter(obj =>
     obj.userData.isCollidable && !obj.userData.isDoor
   );
 
@@ -153,7 +153,7 @@ function updateCamera() {
   // 4. Финальная позиция камеры с плавностью и коллизиями
   const smoothCamX = player.position.x + Math.sin(cameraAngle) * currentCameraDistance;
   const smoothCamZ = player.position.z + Math.cos(cameraAngle) * currentCameraDistance;
-  
+
   // Плавное перемещение камеры (Lerp)
   camera.position.lerp(
     new THREE.Vector3(smoothCamX, player.position.y + cameraHeight, smoothCamZ),
@@ -551,104 +551,135 @@ function initJoysticks() {
 function setupJoystick(joystickElement, type) {
   const area = joystickElement.querySelector('.joystick-area');
   const thumb = joystickElement.querySelector('.joystick-thumb');
-  const rect = joystickElement.getBoundingClientRect();
-  const center = { x: rect.width / 2, y: rect.height / 2 };
-  const maxDist = rect.width / 3;
+  const isHorizontalOnly = type === 'right';
 
   let activeTouchId = null;
+  let maxDist = 0;
+  let baseRect = null;
 
-  area.addEventListener('mousedown', (e) => {
-    if (e.button === 0) {
-      activeTouchId = 'mouse';
-      activeTouches.mouse = type;
-      updateJoystick({
-        clientX: e.clientX,
-        clientY: e.clientY
-      }, true);
+  // Инициализация размеров
+  function initSizes() {
+    const rect = area.getBoundingClientRect();
+    maxDist = isHorizontalOnly ? rect.width / 2.5 : rect.width / 2.2;
+    baseRect = {
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+      centerX: rect.left + rect.width / 2,
+      centerY: rect.top + rect.height / 2
+    };
+  }
+
+  // Инициализируем при первом запуске
+  initSizes();
+
+  // Обработчик для обновления позиции
+  function updatePosition(clientX, clientY, isStart) {
+    // Обновляем размеры на случай изменения layout
+    initSizes();
+
+    let x = clientX - baseRect.centerX;
+    let y = clientY - baseRect.centerY;
+
+    // Для правого джойстика - только горизонтальное движение
+    if (isHorizontalOnly) {
+      y = 0;
     }
-    e.preventDefault();
-  });
 
-  document.addEventListener('mousemove', (e) => {
-    if (activeTouchId === 'mouse') {
-      updateJoystick({
-        clientX: e.clientX,
-        clientY: e.clientY
-      }, false);
-    }
-    e.preventDefault();
-  });
-
-  document.addEventListener('mouseup', (e) => {
-    if (e.button === 0 && activeTouchId === 'mouse') {
-      resetJoystick();
-      delete activeTouches.mouse;
-      activeTouchId = null;
-    }
-    e.preventDefault();
-  });
-
-  area.addEventListener('touchstart', (e) => {
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const touch = e.changedTouches[i];
-      if (!activeTouches[touch.identifier] && !activeTouchId) {
-        activeTouchId = touch.identifier;
-        activeTouches[touch.identifier] = type;
-        updateJoystick(touch, true);
-        break;
-      }
-    }
-    e.preventDefault();
-  });
-
-  document.addEventListener('touchmove', (e) => {
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const touch = e.changedTouches[i];
-      if (touch.identifier === activeTouchId) {
-        updateJoystick(touch, false);
-        break;
-      }
-    }
-    e.preventDefault();
-  });
-
-  document.addEventListener('touchend', (e) => {
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const touch = e.changedTouches[i];
-      if (touch.identifier === activeTouchId) {
-        resetJoystick();
-        delete activeTouches[touch.identifier];
-        activeTouchId = null;
-        break;
-      }
-    }
-    e.preventDefault();
-  });
-
-  function updateJoystick(touch, isStart) {
-    const x = touch.clientX - rect.left - center.x;
-    const y = touch.clientY - rect.top - center.y;
+    // Ограничиваем расстояние от центра
     const dist = Math.min(Math.sqrt(x * x + y * y), maxDist);
     const angle = Math.atan2(y, x);
 
     const nx = dist * Math.cos(angle);
     const ny = dist * Math.sin(angle);
 
+    // Обновляем данные управления
     joystickData[type].x = nx / maxDist;
-    joystickData[type].y = -ny / maxDist;
+    joystickData[type].y = isHorizontalOnly ? 0 : -ny / maxDist;
     joystickData[type].active = true;
 
+    // Плавное появление при первом касании
     if (isStart) {
       thumb.style.transition = 'none';
     }
-    thumb.style.transform = `translate(${nx}px, ${ny}px)`;
+
+    // Применяем трансформацию
+    thumb.style.transform = `translate(calc(-50% + ${nx}px), calc(-50% + ${ny}px))`;
   }
 
-  function resetJoystick() {
+  // Сброс позиции
+  function resetPosition() {
     joystickData[type] = { x: 0, y: 0, active: false };
     thumb.style.transition = 'transform 0.2s ease-out';
     thumb.style.transform = 'translate(-50%, -50%)';
   }
+
+  // Обработчики событий
+  function handleStart(clientX, clientY, id) {
+    activeTouchId = id;
+    updatePosition(clientX, clientY, true);
+  }
+
+  function handleMove(clientX, clientY) {
+    if (activeTouchId !== null) {
+      updatePosition(clientX, clientY, false);
+    }
+  }
+
+  function handleEnd() {
+    resetPosition();
+    activeTouchId = null;
+  }
+
+  // Мышиные события
+  area.addEventListener('mousedown', (e) => {
+    if (e.button === 0 && activeTouchId === null) {
+      handleStart(e.clientX, e.clientY, 'mouse');
+    }
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    handleMove(e.clientX, e.clientY);
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    if (e.button === 0 && activeTouchId === 'mouse') {
+      handleEnd();
+    }
+  });
+
+  // Сенсорные события
+  area.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (activeTouchId === null && e.changedTouches.length > 0) {
+      const touch = e.changedTouches[0];
+      handleStart(touch.clientX, touch.clientY, touch.identifier);
+    }
+  });
+
+  document.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (activeTouchId !== null) {
+      const touch = Array.from(e.changedTouches).find(t => t.identifier === activeTouchId);
+      if (touch) {
+        handleMove(touch.clientX, touch.clientY);
+      }
+    }
+  });
+
+  document.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (activeTouchId !== null) {
+      const touch = Array.from(e.changedTouches).find(t => t.identifier === activeTouchId);
+      if (touch) {
+        handleEnd();
+      }
+    }
+  });
+
+  // Реинициализация при изменении размера окна
+  window.addEventListener('resize', initSizes);
 }
 
 initJoysticks();
