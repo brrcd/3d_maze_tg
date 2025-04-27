@@ -18,31 +18,52 @@ const collidableObjects = [];
 const interactableObjects = [];
 const doors = [];
 
-gltfLoader.load('assets/levels/start_3.glb', (gltf) => {
-  scene.add(gltf.scene);
+// Получаем элементы стартового экрана и кнопки
+const startScreen = document.getElementById('start-screen');
+const startButton = document.getElementById('start-button');
 
-  gltf.scene.traverse(child => {
-    if (child.userData?.isCollidable) {
-      child.box3 = new THREE.Box3().setFromObject(child);
-      collidableObjects.push(child);
-    }
+let levelLoaded = false; // Флаг для отслеживания загрузки уровня
 
-    if (child.userData?.isInteractable) {
-      interactableObjects.push(child);
-    }
+// Обработчик клика по кнопке "Начать игру"
+startButton.addEventListener('click', () => {
+  if (!levelLoaded) {
+    loadLevel(); // Загружаем уровень
+    levelLoaded = true; // Отмечаем, что уровень загружен
+  }
+  startScreen.style.display = 'none'; // Скрываем стартовый экран
+});
 
-    if (child.userData?.isDoor) {
-      doors.push(child);
-      child.userData.isInteractable = true;
-      child.userData.isClosed = true;
-      collidableObjects.push(child);
+function loadLevel() {
+  // Здесь можно добавить логику загрузки уровня
+  console.log('Загрузка уровня...');
+
+  // Пример загрузки уровня через GLTFLoader
+  gltfLoader.load('assets/levels/start_3.glb', (gltf) => {
+    scene.add(gltf.scene);
+
+    gltf.scene.traverse(child => {
+      if (child.userData?.isCollidable) {
+        child.box3 = new THREE.Box3().setFromObject(child);
+        collidableObjects.push(child);
+      }
+
+      if (child.userData?.isInteractable) {
+        interactableObjects.push(child);
+      }
+
+      if (child.userData?.isDoor) {
+        doors.push(child);
+        child.userData.isInteractable = true;
+        child.userData.isClosed = true;
+        collidableObjects.push(child);
+      }
+    });
+
+    if (window.showCollisionDebug) {
+      createCollisionHelpers();
     }
   });
-
-  if (window.showCollisionDebug) {
-    createCollisionHelpers();
-  }
-});
+}
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.add(audioListener);
@@ -389,52 +410,52 @@ function playAnimation(name) {
 
 function checkCollision(position) {
   if (!playerReady) return { collision: false, slideVector: new THREE.Vector3() };
-  
+
   const playerSize = new THREE.Vector3(0.8, 1.5, 0.8);
   const playerBox = new THREE.Box3(
     new THREE.Vector3().copy(position).sub(playerSize),
     new THREE.Vector3().copy(position).add(playerSize)
   );
-  
+
   if (window.showCollisionDebug) {
     const playerHelper = collisionHelpers.find(h => h.box === playerBox);
     if (playerHelper) {
       playerHelper.box.copy(playerBox);
     }
   }
-  
+
   let collision = false;
   let slideVector = new THREE.Vector3();
-  
+
   for (const child of collidableObjects) {
     // Проверяем, является ли объект дверью и закрыта ли она
     const isClosedDoor = child.userData.isDoor && child.userData.isClosed;
-    
+
     // Если это закрытая дверь или обычный коллизионный объект
     if ((child.userData.isCollidable && !child.userData.isDoor) || isClosedDoor) {
       if (!child.box3) {
         child.box3 = new THREE.Box3().setFromObject(child); // Создаем bounding box если его нет
       }
-      
+
       if (playerBox.intersectsBox(child.box3)) {
         collision = true;
-        
+
         // Вычисляем вектор "выталкивания"
         const overlap = new THREE.Vector3();
         child.box3.getCenter(overlap).sub(position);
-        
+
         // Определяем направление "выталкивания"
         if (Math.abs(overlap.x) > Math.abs(overlap.z)) {
           overlap.z = 0;
         } else {
           overlap.x = 0;
         }
-        
+
         slideVector.add(overlap.normalize());
       }
     }
   }
-  
+
   return {
     collision,
     slideVector: slideVector.normalize()
