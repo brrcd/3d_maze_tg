@@ -1,4 +1,5 @@
 const scene = new THREE.Scene();
+const actionButton = document.getElementById('action-button');
 const textureLoader = new THREE.TextureLoader();
 const clock = new THREE.Clock();
 const audioListener = new THREE.AudioListener();
@@ -13,29 +14,20 @@ const keyboardState = {
   KeyD: false  // вправо
 };
 
-gltfLoader.load(
-  'assets/levels/start_2.glb',
-  (gltf) => {
-    scene.add(gltf.scene);
-  },
-  (xhr) => {
-    // console.log((xhr.loaded / xhr.total * 100) + '% загружено');
-  },
-  (error) => {
-    console.error('Ошибка загрузки GLTF:', error);
-  }
-);
-
 const collidableObjects = [];
+const interactableObjects = [];
 
-gltfLoader.load('assets/levels/start_2.glb', (gltf) => {
+gltfLoader.load('assets/levels/start_3.glb', (gltf) => {
   scene.add(gltf.scene);
 
-  // Собираем коллизионные объекты
   gltf.scene.traverse(child => {
     if (child.userData?.isCollidable) {
       child.box3 = new THREE.Box3().setFromObject(child);
       collidableObjects.push(child);
+    }
+
+    if (child.userData?.isInteractable) {
+      interactableObjects.push(child);
     }
   });
 
@@ -684,47 +676,32 @@ function setupJoystick(joystickElement, type) {
 
 initJoysticks();
 
-const cdGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.01, 24);
-const cdMaterial = new THREE.MeshPhongMaterial({
-  color: 0x00ffff,
-  shininess: 100,
-  specular: 0x111111
-});
+function checkInteractableProximity() {
+  if (!playerReady) return false;
 
-const cd = new THREE.Mesh(cdGeometry, cdMaterial);
-cd.position.set(1, 1, -10);
-cd.rotation.z = Math.PI / 2;
-scene.add(cd);
+  let closestDistance = Infinity;
+  let closestObject = null;
 
-cd.material.emissiveIntensity = 0.5;
-// cd.material.emissiveMap = cdTexture;
+  interactableObjects.forEach(obj => {
+    const distance = player.position.distanceTo(obj.position);
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestObject = obj;
+    }
+  });
 
-function checkPlayerProximity() {
-  if (!playerReady) return false; // Проверка готовности
-
-  const distance = player.position.distanceTo(cd.position);
-  const isClose = distance < 2.5;
+  const isClose = closestDistance < 2.5;
 
   if (isClose) {
-    if (!sound.isPlaying) sound.play();
-    tweenVolumeTo(0.5);
-    cd.material.emissiveIntensity = 0.5;
+    actionButton.style.background = 'rgba(255, 255, 255, 0.8)';
+    actionButton.style.transform = 'scale(1.05)';
   } else {
-    tweenVolumeTo(0);
-    cd.material.emissiveIntensity = 0;
+    actionButton.style.background = 'rgba(255, 255, 255, 0.3)';
+    actionButton.style.transform = 'scale(1)';
   }
 
   return isClose;
 }
-
-const cdAnimation = {
-  active: false,
-  startTime: 0,
-  duration: 2000,
-  baseY: 1,
-  height: 0.3,
-  rotation: Math.PI
-};
 
 let volumeTweenInterval = null;
 let currentTargetVolume = null;
@@ -755,26 +732,6 @@ function tweenVolumeTo(targetVolume, speed = 0.05) {
   }, 100);
 }
 
-function animateCD(deltaTime) {
-  if (!cdAnimation.active) {
-    if (checkPlayerProximity()) {
-      cdAnimation.active = true;
-      cdAnimation.startTime = Date.now();
-    }
-    return;
-  }
-
-  const elapsed = Date.now() - cdAnimation.startTime;
-  const progress = Math.min(elapsed / cdAnimation.duration, 1);
-
-  cd.position.y = cdAnimation.baseY + (Math.sin(progress * Math.PI) * cdAnimation.height);
-  cd.rotation.y = progress * cdAnimation.rotation;
-
-  if (progress >= 1) {
-    cdAnimation.active = false;
-  }
-}
-
 const targetFPS = 120;
 const frameTime = 1000 / targetFPS;
 let lastFrameTime = 0;
@@ -793,9 +750,9 @@ function animate(currentTime) {
 
   if (mixer) mixer.update(delta);
   if (playerReady) {
-    animateCD(delta);
     handlePlayerMovement();
     updateCamera();
+    checkInteractableProximity();
   }
 
   composer.render();

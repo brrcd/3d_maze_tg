@@ -1,43 +1,46 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Maze for Telegram</title>
-    <style>
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            touch-action: none; /* Для мобильных устройств */
-        }
-        canvas { 
-            display: block; 
-        }
-    </style>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Maze for Telegram</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-    <div id="joystick-container">
-        <!-- Левый джойстик (движение) -->
-        <div id="left-joystick" class="joystick">
-          <div class="joystick-area"></div>
-          <div class="joystick-thumb"></div>
-        </div>
-        
-        <!-- Правый джойстик (камера) -->
-        <div id="right-joystick" class="joystick">
-          <div class="joystick-area"></div>
-          <div class="joystick-thumb"></div>
-        </div>
-      </div>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/fflate@0.7.4/umd/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/FBXLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/EffectComposer.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/RenderPass.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/ShaderPass.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/shaders/CopyShader.min.js"></script>
-    <script src="script.js"></script>
+  <div id="joystick-container">
+    <div id="left-joystick" class="joystick">
+      <div class="joystick-area"></div>
+      <div class="joystick-thumb"></div>
+    </div>
+
+    <div id="right-joystick" class="joystick">
+      <div class="joystick-area"></div>
+      <div class="joystick-thumb"></div>
+    </div>
+  </div>
+  <div id="action-button"></div>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fflate@0.7.4/umd/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/FBXLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/EffectComposer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/RenderPass.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/ShaderPass.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/shaders/CopyShader.min.js"></script>
+  <script src="script.js"></script>
 </body>
+
 </html>

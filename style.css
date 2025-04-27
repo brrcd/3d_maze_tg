@@ -71,3 +71,22 @@ body {
   width: 50px;
   height: 50px;
 }
+
+#action-button {
+  position: fixed;
+  bottom: 120px; /* чуть выше правого джойстика */
+  right: 50px;
+  width: 120px;
+  height: 50px;
+  background: rgba(255, 255, 255, 0.3);
+  border: 2px solid white;
+  border-radius: 12px;
+  text-align: center;
+  line-height: 50px;
+  font-size: 18px;
+  color: white;
+  font-weight: bold;
+  pointer-events: none; /* чтобы не мешала джойстику */
+  z-index: 200;
+  transition: background 0.3s, transform 0.3s;
+}
