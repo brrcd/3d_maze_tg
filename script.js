@@ -914,13 +914,21 @@ document.addEventListener('keyup', (e) => {
   }
 });
 
-actionButton.addEventListener('click', () => {
+function handleAction() {
   if (!currentInteractable) return;
-
   // Если это дверь
   if (currentInteractable.userData.isDoor) {
     toggleDoor(currentInteractable);
   }
+}
+
+// Обработка кликов мыши
+actionButton.addEventListener('click', handleAction);
+
+// Обработка касаний (touch)
+actionButton.addEventListener('touchstart', (e) => {
+  e.preventDefault(); // Предотвращаем стандартное поведение
+  handleAction();
 });
 
 function easeOutQuad(t) {
