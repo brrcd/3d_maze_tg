@@ -745,25 +745,36 @@ const targetFPS = 120;
 const frameTime = 1000 / targetFPS;
 let lastFrameTime = 0;
 
-function openDoor(door) {
-  if (door.userData.isOpened) return; // Уже открыта
+function toggleDoor(door) {
+  if (door.userData.isAnimating) return; 
+  door.userData.isAnimating = true;
 
-  door.userData.isOpened = true;
-
-  // Плавная анимация открытия (например, поворот вокруг оси Y)
+  const isClosed = door.userData.isClosed;
+  const isLeftHanded = door.userData.isLeftHanded;
   const duration = 1000; // мс
+
   const startRotation = door.rotation.y;
-  const targetRotation = startRotation + Math.PI / 2; // на 90 градусов
+  const angle = Math.PI / 2; 
+  const direction = isLeftHanded ? 1 : -1; 
+
+  const targetRotation = isClosed
+    ? startRotation + direction * angle
+    : startRotation - direction * angle;
 
   const startTime = Date.now();
-
+  
   function animateDoor() {
     const elapsed = Date.now() - startTime;
     const progress = Math.min(elapsed / duration, 1);
-    door.rotation.y = startRotation + (targetRotation - startRotation) * progress;
+    const easedProgress = easeOutQuad(progress);
+
+    door.rotation.y = startRotation + (targetRotation - startRotation) * easedProgress;
 
     if (progress < 1) {
       requestAnimationFrame(animateDoor);
+    } else {
+      door.userData.isClosed = !door.userData.isClosed;
+      door.userData.isAnimating = false;
     }
   }
 
@@ -868,6 +879,10 @@ actionButton.addEventListener('click', () => {
 
   // Если это дверь
   if (currentInteractable.userData.isDoor) {
-    openDoor(currentInteractable);
+    toggleDoor(currentInteractable);
   }
 });
+
+function easeOutQuad(t) {
+  return t * (2 - t);
+}
