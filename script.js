@@ -34,6 +34,15 @@ startButton.addEventListener('click', () => {
   startScreen.style.display = 'none'; // Скрываем стартовый экран
 });
 
+startButton.addEventListener('touchstart', (e) => {
+  if (!levelLoaded) {
+    loadLevel(); // Загружаем уровень
+    setControlListeners();
+    levelLoaded = true; // Отмечаем, что уровень загружен
+  }
+  startScreen.style.display = 'none'; // Скрываем стартовый экран
+});
+
 function loadLevel() {
   // Здесь можно добавить логику загрузки уровня
   console.log('Загрузка уровня...');
