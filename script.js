@@ -746,33 +746,63 @@ const frameTime = 1000 / targetFPS;
 let lastFrameTime = 0;
 
 function toggleDoor(door) {
-  if (door.userData.isAnimating) return; 
+  if (door.userData.isAnimating) return;
   door.userData.isAnimating = true;
 
   const isClosed = door.userData.isClosed;
   const isLeftHanded = door.userData.isLeftHanded;
   const duration = 1000; // мс
 
+  // Сохраняем начальные значения
   const startRotation = door.rotation.y;
-  const angle = Math.PI / 2; 
-  const direction = isLeftHanded ? 1 : -1; 
+  const startPosition = door.position.clone();
 
+  const doorWidth = door.geometry.boundingBox.max.x - door.geometry.boundingBox.min.x;
+  const offset = isLeftHanded ? -doorWidth / 2 : doorWidth / 2;
+
+  const hingePosition = new THREE.Vector3();
+  hingePosition.copy(startPosition);
+  hingePosition.x = isClosed ? hingePosition.x : hingePosition.x += offset;
+  hingePosition.z = isClosed ? hingePosition.z + offset : hingePosition.z;
+
+  const angle = Math.PI / 2;
+  const direction = isLeftHanded ? -1 : 1;
   const targetRotation = isClosed
     ? startRotation + direction * angle
     : startRotation - direction * angle;
+  const targetPosition = new THREE.Vector3();
+  targetPosition.copy(startPosition);
+  if (isClosed) {
+    targetPosition.x -= offset;
+    targetPosition.z += offset;
+  }
+  else {
+    targetPosition.x += offset;
+    targetPosition.z -= offset;
+  }
+  console.log("target position " + targetPosition);
 
   const startTime = Date.now();
-  
+
   function animateDoor() {
     const elapsed = Date.now() - startTime;
     const progress = Math.min(elapsed / duration, 1);
     const easedProgress = easeOutQuad(progress);
 
-    door.rotation.y = startRotation + (targetRotation - startRotation) * easedProgress;
+    // Вычисляем текущий угол
+    const currentRotation = startRotation + (targetRotation - startRotation) * easedProgress;
+
+    // Применяем трансформацию
+    door.position.copy(hingePosition);
+    door.rotation.y = currentRotation;
+    door.translateX(isLeftHanded ? doorWidth / 2 : -doorWidth / 2);
 
     if (progress < 1) {
       requestAnimationFrame(animateDoor);
     } else {
+      // При завершении анимации возвращаемся к исходной позиции
+      door.position.copy(targetPosition);
+      door.rotation.y = targetRotation;
       door.userData.isClosed = !door.userData.isClosed;
       door.userData.isAnimating = false;
     }
