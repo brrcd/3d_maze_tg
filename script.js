@@ -644,7 +644,7 @@ const joystickSystem = {
 
     const handleStart = (clientX, clientY, id) => {
       if (!gameState.gameStarted) return;
-      
+
       activeTouchId = id;
       updatePosition(clientX, clientY, true);
     };
@@ -925,23 +925,20 @@ function initGame() {
   const startButton = document.getElementById('start-button');
 
   startButton.addEventListener('click', () => {
-    if (!gameState.levelLoaded) {
-      levelSystem.load();
-      gameState.levelLoaded = true;
-    }
     startScreen.style.display = 'none';
     gameState.gameStarted = true;
   });
 
   startButton.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    if (!gameState.levelLoaded) {
-      levelSystem.load();
-      gameState.levelLoaded = true;
-    }
     startScreen.style.display = 'none';
     gameState.gameStarted = true;
   });
+
+  if (!gameState.levelLoaded) {
+    levelSystem.load();
+    gameState.levelLoaded = true;
+  }
 }
 
 function gameLoop(currentTime) {
