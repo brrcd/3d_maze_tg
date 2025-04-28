@@ -8,7 +8,14 @@ const SETTINGS = {
   ditherPixelSize: 3,
   stepSoundVolume: 0.3,
   doorSoundVolume: 0.5,
-  musicVolume: 0.001
+  musicVolume: 0.001,
+  introPhrases: [
+    "Добро пожаловать в лабораторию",
+    "Здесь происходят странные вещи",
+    "Сможете ли вы найти выход?",
+  ],
+  typingSpeed: 50,
+  phraseDelay: 2000
 };
 
 // Инициализация сцены и рендерера
@@ -874,6 +881,8 @@ function initGame() {
   postProcessingSystem.init();
   playerSystem.loadPlayerModel();
   controlSystem.init();
+  introSystem.init();
+  levelSystem.load();
 
   // Обработчики событий
   document.addEventListener('click', () => {
@@ -935,10 +944,15 @@ function initGame() {
     gameState.gameStarted = true;
   });
 
-  if (!gameState.levelLoaded) {
-    levelSystem.load();
-    gameState.levelLoaded = true;
-  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      introSystem.skipToNextPhrase();
+    }
+  });
+  
+  document.getElementById('start-screen').addEventListener('click', () => {
+    introSystem.skipToNextPhrase();
+  });
 }
 
 function gameLoop(currentTime) {
@@ -954,6 +968,110 @@ function gameLoop(currentTime) {
 
   postProcessingSystem.composer.render();
 }
+
+const introSystem = {
+  currentPhraseIndex: 0,
+  typingInterval: null,
+  isTyping: false,
+
+  init: function() {
+    const startScreen = document.getElementById('start-screen');
+    startScreen.innerHTML = `
+      <div id="intro-text" style="
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: orange;
+        font-family: 'Courier New', monospace;
+        font-size: 24px;
+        text-align: center;
+        width: 80%;
+      "></div>
+      <button id="start-button" style="
+        position: absolute;
+        top: 70%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 10px 20px;
+        font-size: 18px;
+        display: none;
+        cursor: pointer;
+        background: rgba(255,255,255,0.2);
+        color: orange;
+        border: 1px solid white;
+        border-radius: 5px;
+      ">НАЧАТЬ ДЕНЬ</button>
+    `;
+
+    this.startTyping();
+  },
+
+  startTyping: function() {
+    const textElement = document.getElementById('intro-text');
+    const startButton = document.getElementById('start-button');
+    
+    if (this.currentPhraseIndex >= SETTINGS.introPhrases.length) {
+      // Все фразы показаны - показываем кнопку
+      textElement.style.display = 'none';
+      startButton.style.display = 'block';
+      return;
+    }
+
+    this.isTyping = true;
+    const phrase = SETTINGS.introPhrases[this.currentPhraseIndex];
+    let charIndex = 0;
+    
+    textElement.textContent = '';
+    
+    this.typingInterval = setInterval(() => {
+      textElement.textContent += phrase[charIndex];
+      charIndex++;
+      
+      if (charIndex >= phrase.length) {
+        clearInterval(this.typingInterval);
+        this.isTyping = false;
+        
+        // Показываем кнопку после последней фразы
+        if (this.currentPhraseIndex === SETTINGS.introPhrases.length - 1) {
+          startButton.style.display = 'block';
+        }
+        
+        // Переход к следующей фразе после задержки
+        setTimeout(() => {
+          if (this.currentPhraseIndex < SETTINGS.introPhrases.length - 1) {
+            textElement.textContent = '';
+            this.currentPhraseIndex++;
+            this.startTyping();
+          }
+        }, SETTINGS.phraseDelay);
+      }
+    }, SETTINGS.typingSpeed);
+  },
+
+  skipToNextPhrase: function() {
+    if (this.isTyping) {
+      clearInterval(this.typingInterval);
+      this.isTyping = false;
+      
+      // Показываем полную текущую фразу
+      const textElement = document.getElementById('intro-text');
+      textElement.textContent = SETTINGS.introPhrases[this.currentPhraseIndex];
+      
+      // Если это последняя фраза - показываем кнопку
+      if (this.currentPhraseIndex === SETTINGS.introPhrases.length - 1) {
+        document.getElementById('start-button').style.display = 'block';
+      } else {
+        // Через короткую задержку переходим к следующей фразе
+        setTimeout(() => {
+          textElement.textContent = '';
+          this.currentPhraseIndex++;
+          this.startTyping();
+        }, 300);
+      }
+    }
+  }
+};
 
 // Запуск игры
 initGame();
