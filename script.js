@@ -15,7 +15,11 @@ const SETTINGS = {
     "Сможете ли вы найти выход?",
   ],
   typingSpeed: 50,
-  phraseDelay: 2000
+  phraseDelay: 2000,
+  startPhone: {
+    ringingVolume: 0.8,
+    startRingingDelay: 1500
+  }
 };
 
 // Инициализация сцены и рендерера
@@ -90,13 +94,13 @@ const audioSystem = {
   currentTargetVolume: null,
   volumeTweenInterval: null,
 
-  init: function() {
+  init: function () {
     this.loadMusic();
     this.loadStepSounds();
     this.loadDoorSounds();
   },
 
-  loadMusic: function() {
+  loadMusic: function () {
     audioLoader.load('assets/audio/music/platformer_1_underscore_modern.wav', (buffer) => {
       this.sound.setBuffer(buffer);
       this.sound.setLoop(true);
@@ -104,7 +108,7 @@ const audioSystem = {
     });
   },
 
-  loadStepSounds: function() {
+  loadStepSounds: function () {
     const stepSoundPaths = [
       'assets/audio/steps/step_wood_1.ogg',
       'assets/audio/steps/step_wood_2.ogg',
@@ -126,7 +130,7 @@ const audioSystem = {
     });
   },
 
-  loadDoorSounds: function() {
+  loadDoorSounds: function () {
     audioLoader.load('assets/audio/door/door_open.mp3', (buffer) => {
       const openSound = new THREE.Audio(audioListener);
       openSound.setBuffer(buffer);
@@ -142,7 +146,7 @@ const audioSystem = {
     });
   },
 
-  playRandomStepSound: function() {
+  playRandomStepSound: function () {
     if (this.stepSounds.length === 0) return;
 
     const randomIndex = Math.floor(Math.random() * this.stepSounds.length);
@@ -156,7 +160,7 @@ const audioSystem = {
     }
   },
 
-  tweenVolumeTo: function(targetVolume, speed = 0.05) {
+  tweenVolumeTo: function (targetVolume, speed = 0.05) {
     if (this.currentTargetVolume === targetVolume) return;
     this.currentTargetVolume = targetVolume;
 
@@ -190,13 +194,13 @@ const animationSystem = {
   currentAction: null,
   lastAnimation: '',
 
-  loadAnimation: function(name, path) {
+  loadAnimation: function (name, path) {
     fbxLoader.load(path, (animFbx) => {
       this.animations[name] = animFbx.animations[0];
     });
   },
 
-  playAnimation: function(name) {
+  playAnimation: function (name) {
     if (!this.animations[name] || !this.mixer) return;
     if (this.lastAnimation === name) return;
 
@@ -217,7 +221,7 @@ const animationSystem = {
 
 // Система коллизий
 const collisionSystem = {
-  checkCollision: function(position) {
+  checkCollision: function (position) {
     if (!gameState.playerReady) return { collision: false, slideVector: new THREE.Vector3() };
 
     const playerSize = new THREE.Vector3(0.8, 1.5, 0.8);
@@ -266,7 +270,7 @@ const collisionSystem = {
     };
   },
 
-  createCollisionHelpers: function() {
+  createCollisionHelpers: function () {
     this.removeCollisionHelpers();
 
     collidableObjects.forEach(obj => {
@@ -284,7 +288,7 @@ const collisionSystem = {
     });
   },
 
-  removeCollisionHelpers: function() {
+  removeCollisionHelpers: function () {
     collisionHelpers.forEach(helper => {
       scene.remove(helper);
     });
@@ -300,7 +304,7 @@ const playerSystem = {
   currentCameraDistance: SETTINGS.cameraDistance,
   currentInteractable: null,
 
-  createFallbackPlayer: function() {
+  createFallbackPlayer: function () {
     this.player = new THREE.Mesh(
       new THREE.BoxGeometry(1, 1, 1),
       new THREE.MeshPhongMaterial({ color: 0xff0000 })
@@ -310,7 +314,7 @@ const playerSystem = {
     gameState.playerReady = true;
   },
 
-  loadPlayerModel: function() {
+  loadPlayerModel: function () {
     fbxLoader.load(
       'assets/models/Hazmat_Character.fbx',
       (fbx) => {
@@ -350,7 +354,7 @@ const playerSystem = {
     );
   },
 
-  updateCamera: function() {
+  updateCamera: function () {
     if (!gameState.playerReady) return;
 
     const desiredCamX = this.player.position.x + Math.sin(this.cameraAngle) * SETTINGS.cameraDistance;
@@ -395,7 +399,7 @@ const playerSystem = {
     camera.lookAt(this.player.position.x, this.player.position.y + 1, this.player.position.z);
   },
 
-  handleMovement: function() {
+  handleMovement: function () {
     if (!gameState.playerReady || !gameState.gameStarted) return;
 
     const cameraDirection = new THREE.Vector3();
@@ -476,7 +480,7 @@ const playerSystem = {
     this.updateCamera();
   },
 
-  checkInteractableProximity: function() {
+  checkInteractableProximity: function () {
     if (!gameState.playerReady || !gameState.gameStarted) return;
 
     let closestDistance = Infinity;
@@ -487,6 +491,7 @@ const playerSystem = {
       if (distance < closestDistance) {
         closestDistance = distance;
         closestObject = obj;
+        // console.log("closest object " + obj + " distance " + distance);
       }
     });
 
@@ -505,15 +510,19 @@ const playerSystem = {
     return isClose;
   },
 
-  handleAction: function() {
+  handleAction: function () {
     if (!this.currentInteractable) return;
-    
+
     if (this.currentInteractable.userData.isDoor) {
       this.toggleDoor(this.currentInteractable);
+    } else if (this.currentInteractable.userData.isRinging) {
+      phoneSystem.stopCall();
+      // Здесь можно добавить логику ответа на звонок
+      console.log("Звонок принят!");
     }
   },
 
-  toggleDoor: function(door) {
+  toggleDoor: function (door) {
     if (door.userData.isAnimating) return;
     door.userData.isAnimating = true;
 
@@ -580,19 +589,19 @@ const playerSystem = {
     animateDoor();
   },
 
-  easeOutQuad: function(t) {
+  easeOutQuad: function (t) {
     return t * (2 - t);
   }
 };
 
 // Система джойстиков
 const joystickSystem = {
-  init: function() {
+  init: function () {
     this.setupJoystick(document.getElementById('left-joystick'), 'left');
     this.setupJoystick(document.getElementById('right-joystick'), 'right');
   },
 
-  setupJoystick: function(joystickElement, type) {
+  setupJoystick: function (joystickElement, type) {
     const area = joystickElement.querySelector('.joystick-area');
     const thumb = joystickElement.querySelector('.joystick-thumb');
     const isHorizontalOnly = type === 'right';
@@ -719,7 +728,7 @@ const joystickSystem = {
 const postProcessingSystem = {
   composer: null,
 
-  init: function() {
+  init: function () {
     const renderTarget = new THREE.WebGLRenderTarget(
       window.innerWidth,
       window.innerHeight,
@@ -791,13 +800,13 @@ const DitherShader = {
 
 // Система управления
 const controlSystem = {
-  init: function() {
+  init: function () {
     this.setKeyboardListeners();
     this.setJoystickListeners();
     this.setActionButtonListener();
   },
 
-  setKeyboardListeners: function() {
+  setKeyboardListeners: function () {
     document.addEventListener('keydown', (e) => {
       if (!gameState.gameStarted) return;
       if (e.code in keyboardState) {
@@ -825,11 +834,11 @@ const controlSystem = {
     });
   },
 
-  setJoystickListeners: function() {
+  setJoystickListeners: function () {
     joystickSystem.init();
   },
 
-  setActionButtonListener: function() {
+  setActionButtonListener: function () {
     const actionButton = document.getElementById('action-button');
     actionButton.addEventListener('click', () => playerSystem.handleAction());
     actionButton.addEventListener('touchstart', (e) => {
@@ -841,9 +850,9 @@ const controlSystem = {
 
 // Система загрузки уровня
 const levelSystem = {
-  load: function() {
+  load: function () {
     if (gameState.levelLoaded) return;
-    
+
     gltfLoader.load('assets/levels/start_3.glb', (gltf) => {
       scene.add(gltf.scene);
 
@@ -868,7 +877,7 @@ const levelSystem = {
       if (gameState.showCollisionDebug) {
         collisionSystem.createCollisionHelpers();
       }
-      
+
       gameState.levelLoaded = true;
     });
   }
@@ -936,12 +945,22 @@ function initGame() {
   startButton.addEventListener('click', () => {
     startScreen.style.display = 'none';
     gameState.gameStarted = true;
+
+    phoneSystem.init();
+    setTimeout(() => {
+      phoneSystem.startCall();
+    }, SETTINGS.startPhone.startRingingDelay);
   });
 
   startButton.addEventListener('touchstart', (e) => {
     e.preventDefault();
     startScreen.style.display = 'none';
     gameState.gameStarted = true;
+
+    phoneSystem.init();
+    setTimeout(() => {
+      phoneSystem.startCall();
+    }, SETTINGS.startPhone.startRingingDelay);
   });
 
   document.addEventListener('keydown', (e) => {
@@ -949,7 +968,7 @@ function initGame() {
       introSystem.skipToNextPhrase();
     }
   });
-  
+
   document.getElementById('start-screen').addEventListener('click', () => {
     introSystem.skipToNextPhrase();
   });
@@ -974,7 +993,7 @@ const introSystem = {
   typingInterval: null,
   isTyping: false,
 
-  init: function() {
+  init: function () {
     const startScreen = document.getElementById('start-screen');
     startScreen.innerHTML = `
       <div id="intro-text" style="
@@ -1007,10 +1026,10 @@ const introSystem = {
     this.startTyping();
   },
 
-  startTyping: function() {
+  startTyping: function () {
     const textElement = document.getElementById('intro-text');
     const startButton = document.getElementById('start-button');
-    
+
     if (this.currentPhraseIndex >= SETTINGS.introPhrases.length) {
       // Все фразы показаны - показываем кнопку
       textElement.style.display = 'none';
@@ -1021,22 +1040,22 @@ const introSystem = {
     this.isTyping = true;
     const phrase = SETTINGS.introPhrases[this.currentPhraseIndex];
     let charIndex = 0;
-    
+
     textElement.textContent = '';
-    
+
     this.typingInterval = setInterval(() => {
       textElement.textContent += phrase[charIndex];
       charIndex++;
-      
+
       if (charIndex >= phrase.length) {
         clearInterval(this.typingInterval);
         this.isTyping = false;
-        
+
         // Показываем кнопку после последней фразы
         if (this.currentPhraseIndex === SETTINGS.introPhrases.length - 1) {
           startButton.style.display = 'block';
         }
-        
+
         // Переход к следующей фразе после задержки
         setTimeout(() => {
           if (this.currentPhraseIndex < SETTINGS.introPhrases.length - 1) {
@@ -1049,15 +1068,15 @@ const introSystem = {
     }, SETTINGS.typingSpeed);
   },
 
-  skipToNextPhrase: function() {
+  skipToNextPhrase: function () {
     if (this.isTyping) {
       clearInterval(this.typingInterval);
       this.isTyping = false;
-      
+
       // Показываем полную текущую фразу
       const textElement = document.getElementById('intro-text');
       textElement.textContent = SETTINGS.introPhrases[this.currentPhraseIndex];
-      
+
       // Если это последняя фраза - показываем кнопку
       if (this.currentPhraseIndex === SETTINGS.introPhrases.length - 1) {
         document.getElementById('start-button').style.display = 'block';
@@ -1068,6 +1087,51 @@ const introSystem = {
           this.currentPhraseIndex++;
           this.startTyping();
         }, 300);
+      }
+    }
+  }
+};
+
+// Система телефонных звонков
+const phoneSystem = {
+  phoneObject: null,
+  phoneSound: null,
+  callTimeout: null,
+  init: function () {
+    this.loadPhoneSound();
+    this.findPhoneObject();
+  },
+  loadPhoneSound: function () {
+    const phoneAudio = new THREE.Audio(audioListener);
+    audioLoader.load('assets/audio/phone/phone.mp3', (buffer) => {
+      phoneAudio.setBuffer(buffer);
+      phoneAudio.setVolume(SETTINGS.startPhone.ringingVolume);
+      phoneAudio.setLoop(true);
+      this.phoneSound = phoneAudio;
+    });
+  },
+  findPhoneObject: function () {
+    scene.traverse((child) => {
+      if (child.userData.isPhone) {
+        this.phoneObject = child;
+        child.userData.isInteractable = true;
+        interactableObjects.push(child);
+      }
+    });
+  },
+  startCall: function () {
+    if (this.phoneSound && !this.phoneSound.isPlaying) {
+      this.phoneSound.play();
+      if (this.phoneObject) {
+        this.phoneObject.userData.isRinging = true;
+      }
+    }
+  },
+  stopCall: function () {
+    if (this.phoneSound && this.phoneSound.isPlaying) {
+      this.phoneSound.stop();
+      if (this.phoneObject) {
+        this.phoneObject.userData.isRinging = false;
       }
     }
   }
