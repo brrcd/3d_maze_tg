@@ -18,7 +18,7 @@ const SETTINGS = {
   phraseDelay: 2000,
   startPhone: {
     ringingVolume: 0.8,
-    startRingingDelay: 1500
+    startRingingDelay: 10000
   }
 };
 
