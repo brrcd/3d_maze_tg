@@ -19,7 +19,8 @@ const SETTINGS = {
   startPhone: {
     ringingVolume: 0.8,
     startRingingDelay: 10000
-  }
+  },
+  targetFPS: 120
 };
 
 // Инициализация сцены и рендерера
@@ -974,8 +975,18 @@ function initGame() {
   });
 }
 
+let lastFrameTime = 0;
+const frameTime = 1000 / SETTINGS.targetFPS;
+
 function gameLoop(currentTime) {
   requestAnimationFrame(gameLoop);
+
+  if (!lastFrameTime) lastFrameTime = currentTime;
+  const deltaTime = currentTime - lastFrameTime;
+  if (deltaTime < frameTime) return;
+
+  lastFrameTime = currentTime;
+
   const delta = clock.getDelta();
 
   if (animationSystem.mixer) animationSystem.mixer.update(delta);
