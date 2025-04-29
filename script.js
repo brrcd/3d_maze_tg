@@ -50,10 +50,7 @@ const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerH
 camera.add(audioListener);
 
 // Освещение
-const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(1, 1, 1);
-scene.add(light);
-scene.add(new THREE.AmbientLight(0x404040));
+scene.add(new THREE.AmbientLight(0xFFFFFF));
 
 // Состояние игры
 const gameState = {
@@ -858,29 +855,28 @@ const levelSystem = {
     woodTexture.wrapS = THREE.RepeatWrapping;
     woodTexture.wrapT = THREE.RepeatWrapping;
 
-    gltfLoader.load('assets/levels/start_3.glb', (gltf) => {
+    gltfLoader.load('assets/levels/level_1.glb', (gltf) => {
       scene.add(gltf.scene);
 
       gltf.scene.traverse(child => {
         if (child.userData?.isWoodFloor && child.isMesh) {
-          // Масштабируем UV-координаты вместо текстуры
           if (child.geometry.attributes.uv) {
             const uvArray = child.geometry.attributes.uv.array;
             const bbox = new THREE.Box3().setFromObject(child);
             const size = new THREE.Vector3();
             bbox.getSize(size);
-            
+
             const scaleU = size.x / 2;
             const scaleV = size.z / 2;
-            
+
             for (let i = 0; i < uvArray.length; i += 2) {
               uvArray[i] *= scaleU;
               uvArray[i + 1] *= scaleV;
             }
-            
+
             child.geometry.attributes.uv.needsUpdate = true;
           }
-          
+
           // Используем один материал для всех
           child.material = new THREE.MeshStandardMaterial({
             map: woodTexture,
