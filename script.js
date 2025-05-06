@@ -1150,7 +1150,7 @@ const phoneSystem = {
   },
   findPhoneObject: function () {
     scene.traverse((child) => {
-      if (child.userData.isPhone) {
+      if (child.userData.isStartingPhone) {
         this.phoneObject = child;
         child.userData.isInteractable = true;
         interactableObjects.push(child);
