@@ -183,7 +183,7 @@ const audioSystem = {
     }
   },
 
-  loadAmbientMusic: function() {
+  loadAmbientMusic: function () {
     SETTINGS.zones.forEach(zone => {
       audioLoader.load(SETTINGS.ambientMusic[zone].path, (buffer) => {
         const sound = new THREE.Audio(audioListener);
@@ -192,7 +192,7 @@ const audioSystem = {
         sound.setVolume(0);
         sound.zone = zone; // сохраняем имя зоны в аудиообъекте
         this.ambientMusic.tracks[zone] = sound;
-        
+
         // Автозапуск музыки комнаты
         if (zone === 'room') {
           sound.setVolume(SETTINGS.ambientMusic.room.volume);
@@ -202,39 +202,39 @@ const audioSystem = {
     });
   },
 
-  switchToZone: function(newZone) {
+  switchToZone: function (newZone) {
     if (this.ambientMusic.currentZone === newZone || this.ambientMusic.isTransitioning) return;
-    
+
     console.log(`Переключаем музыку с ${this.ambientMusic.currentZone} на ${newZone}`);
-    
+
     this.ambientMusic.isTransitioning = true;
     this.ambientMusic.transitionStartTime = Date.now();
     this.ambientMusic.fromTrack = this.ambientMusic.tracks[this.ambientMusic.currentZone];
     this.ambientMusic.toTrack = this.ambientMusic.tracks[newZone];
     this.ambientMusic.currentZone = newZone;
-    
+
     // Если трек еще не играет, запускаем его
     if (!this.ambientMusic.toTrack.isPlaying) {
       this.ambientMusic.toTrack.play();
     }
   },
 
-  updateMusicTransition: function() {
+  updateMusicTransition: function () {
     if (!this.ambientMusic.isTransitioning) return;
-    
+
     const elapsed = (Date.now() - this.ambientMusic.transitionStartTime) / 1000;
     const progress = Math.min(elapsed / SETTINGS.ambientMusic.fadeDuration, 1);
-    
+
     // Плавное уменьшение громкости предыдущего трека
     if (this.ambientMusic.fromTrack) {
       const fromVolume = SETTINGS.ambientMusic[this.ambientMusic.fromTrack.zone].volume;
       this.ambientMusic.fromTrack.setVolume(THREE.MathUtils.lerp(fromVolume, 0, progress));
     }
-    
+
     // Плавное увеличение громкости нового трека
     const toVolume = SETTINGS.ambientMusic[this.ambientMusic.toTrack.zone].volume;
     this.ambientMusic.toTrack.setVolume(THREE.MathUtils.lerp(0, toVolume, progress));
-    
+
     // Завершение перехода
     if (progress >= 1) {
       this.ambientMusic.isTransitioning = false;
@@ -618,12 +618,20 @@ const playerSystem = {
     const startPosition = door.position.clone();
 
     const doorWidth = door.geometry.boundingBox.max.x - door.geometry.boundingBox.min.x;
-    const offset = isLeftHanded ? -doorWidth / 2 : doorWidth / 2;
+    const doorLength = door.geometry.boundingBox.max.z - door.geometry.boundingBox.min.z;
+    const isUsingWidth = doorWidth > 0.01
+    const usedDimension = isUsingWidth ? doorWidth : doorLength
+    const offset = isLeftHanded ? - usedDimension / 2 : usedDimension / 2;
 
     const hingePosition = new THREE.Vector3();
     hingePosition.copy(startPosition);
-    hingePosition.x = isClosed ? hingePosition.x + offset : hingePosition.x;
-    hingePosition.z = isClosed ? hingePosition.z : hingePosition.z + offset;
+    if (isUsingWidth) {
+      hingePosition.x = isClosed ? hingePosition.x + offset : hingePosition.x;
+      hingePosition.z = isClosed ? hingePosition.z : hingePosition.z + offset;
+    } else {
+      hingePosition.x = isClosed ? hingePosition.x : hingePosition.x + offset;
+      hingePosition.z = isClosed ? hingePosition.z - offset : hingePosition.z;
+    }
 
     const angle = Math.PI / 2;
     const direction = isLeftHanded ? 1 : -1;
@@ -632,13 +640,13 @@ const playerSystem = {
       : startRotation - direction * angle;
     const targetPosition = new THREE.Vector3();
     targetPosition.copy(startPosition);
-    if (!isClosed) {
-      targetPosition.x -= offset;
-      targetPosition.z += offset;
-    }
-    else {
-      targetPosition.x += offset;
-      targetPosition.z -= offset;
+
+    if (isUsingWidth) {
+      targetPosition.x = isClosed ? targetPosition.x + offset : targetPosition.x - offset;
+      targetPosition.z = isClosed ? targetPosition.z - offset : targetPosition.z + offset;
+    } else {
+      targetPosition.x = isClosed ? targetPosition.x - offset : targetPosition.x + offset;
+      targetPosition.z = isClosed ? targetPosition.z - offset : targetPosition.z + offset;
     }
 
     if (isClosed && audioSystem.doorSounds.open) {
@@ -658,7 +666,12 @@ const playerSystem = {
 
       door.position.copy(hingePosition);
       door.rotation.y = currentRotation;
-      door.translateX(isLeftHanded ? doorWidth / 2 : -doorWidth / 2);
+
+      if (isUsingWidth) {
+        door.translateX(isLeftHanded ? usedDimension / 2 : - usedDimension / 2);
+      } else {
+        door.translateZ(isLeftHanded ? - usedDimension / 2 : usedDimension / 2);
+      }
 
       if (progress < 1) {
         requestAnimationFrame(animateDoor);
@@ -1002,34 +1015,34 @@ const zoneSystem = {
   lastTrigger: null, // Последний активированный триггер
   lastTriggerTime: 0, // Время последней активации
 
-  init: function() {
+  init: function () {
     this.findTriggers();
   },
 
-  findTriggers: function() {
-    scene.traverse((child) => {      
+  findTriggers: function () {
+    scene.traverse((child) => {
       if (child.userData.isAmbientMusicSwitchTrigger) {
         child.box3 = new THREE.Box3().setFromObject(child);
         child.visible = false;
         this.triggers.push(child);
         console.log(`Найден триггер между ${child.userData.zoneA} и ${child.userData.zoneB}`);
-      } 
+      }
     });
   },
 
-  checkPlayerPosition: function(playerPosition) {
+  checkPlayerPosition: function (playerPosition) {
     if (!gameState.playerReady) return;
-    
+
     const now = Date.now();
     // Защита от частых срабатываний (минимум 1 секунда между переключениями)
     if (now - this.lastTriggerTime < 1000) return;
-    
+
     const playerSize = new THREE.Vector3(0.8, 1.5, 0.8);
     const playerBox = new THREE.Box3(
       playerPosition.clone().sub(playerSize),
       playerPosition.clone().add(playerSize)
     );
-    
+
     for (const trigger of this.triggers) {
       if (playerBox.intersectsBox(trigger.box3) && trigger !== this.lastTrigger) {
         this.lastTrigger = trigger;
@@ -1040,7 +1053,7 @@ const zoneSystem = {
     }
   },
 
-  handleZoneTransition: function(playerPosition, trigger) {
+  handleZoneTransition: function (playerPosition, trigger) {
     const fromZone = audioSystem.ambientMusic.currentZone;
     let toZone;
 
@@ -1169,7 +1182,7 @@ function gameLoop(currentTime) {
     playerSystem.checkInteractableProximity();
     zoneSystem.checkPlayerPosition(playerSystem.player.position); // Проверяем переходы
   }
-  
+
   audioSystem.updateMusicTransition(); // Обновляем переходы музыки
 
   postProcessingSystem.composer.render();
