@@ -117,34 +117,14 @@ const audioSystem = {
   },
 
   init: function() {
-    // Фикс для iOS
-    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-      // Создаем пустой звук для разблокировки
-      const context = new (window.AudioContext || window.webkitAudioContext)();
-      const source = context.createBufferSource();
-      source.buffer = context.createBuffer(1, 1, 22050);
-      source.connect(context.destination);
-      source.start(0);
-      source.stop(0.1);
-      
-      // Задержка для инициализации
-      setTimeout(() => {
-        this.loadMusic();
-        this.loadAmbientMusic();
-        this.loadStepSounds();
-        this.loadDoorSounds();
-        
-        // Устанавливаем нулевую громкость и постепенно увеличиваем
-        this.sound.setVolume(0);
-        setTimeout(() => this.sound.setVolume(SETTINGS.musicVolume), 1000);
-      }, 300);
-    } else {
-      // Стандартная инициализация для других платформ
-      this.loadMusic();
-      this.loadAmbientMusic();
-      this.loadStepSounds();
-      this.loadDoorSounds();
-    }
+    // Только загрузка, без воспроизведения
+    this.loadMusic();
+    this.loadAmbientMusic();
+    this.loadStepSounds();
+    this.loadDoorSounds();
+    
+    // Начинаем с нулевой громкости
+    this.sound.setVolume(0);
   },
 
   loadMusic: function () {
@@ -206,23 +186,15 @@ const audioSystem = {
       stepSound.play();
     }
   },
-
+  
   loadAmbientMusic: function() {
     SETTINGS.zones.forEach(zone => {
       audioLoader.load(SETTINGS.ambientMusic[zone].path, (buffer) => {
         const sound = new THREE.Audio(audioListener);
         sound.setBuffer(buffer);
         sound.setLoop(true);
-        sound.setVolume(zone === 'room' ? SETTINGS.ambientMusic[zone].volume : 0);
-        
-        // Фикс для iOS - запускаем и сразу приостанавливаем
-        if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-          sound.play().then(() => {
-            sound.pause();
-            if (zone === 'room') sound.play();
-          }).catch(e => console.log('Audio play error:', e));
-        }
-        
+        sound.setVolume(0); // Начинаем с нулевой громкости
+        sound.zone = zone;
         this.ambientMusic.tracks[zone] = sound;
       });
     });
@@ -1094,146 +1066,40 @@ const zoneSystem = {
   }
 };
 
-// Инициализация игры
 function initGame() {
-  // Инициализация систем
   postProcessingSystem.init();
   playerSystem.loadPlayerModel();
   controlSystem.init();
   introSystem.init();
   levelSystem.load();
 
-  // Фикс для iOS
-  const unlockAudio = () => {
-    if (!gameState.audioInitialized) {
-      // Создаем и сразу останавливаем пустой звук
-      const context = new (window.AudioContext || window.webkitAudioContext)();
-      const source = context.createBufferSource();
-      source.buffer = context.createBuffer(1, 1, 22050);
-      source.connect(context.destination);
-      source.start(0);
-      source.stop(0.1);
-      
-      // Инициализируем звуковую систему
-      audioSystem.init();
-      
-      // Запускаем фоновую музыку
-      setTimeout(() => {
-        if (audioSystem.ambientMusic.tracks['room']) {
-          audioSystem.ambientMusic.tracks['room'].play();
-        }
-      }, 500);
-      
-      gameState.audioInitialized = true;
-      
-      document.removeEventListener('click', unlockAudio);
-      document.removeEventListener('touchstart', unlockAudio);
-    }
-  };
-
-  // Вешаем обработчики на разные события
-  document.addEventListener('click', unlockAudio);
-  document.addEventListener('touchstart', unlockAudio);
-  document.addEventListener('keydown', unlockAudio);
-  
-  // Для Telegram WebApp
-  if (window.Telegram && Telegram.WebApp) {
-    Telegram.WebApp.expand();
-    Telegram.WebApp.enableClosingConfirmation();
-    Telegram.WebApp.onEvent('viewportChanged', unlockAudio);
-  }
-
-  const handleFirstInteraction = () => {
-    // Запускаем звуковую систему
-    if (audioSystem.sound.context.state === 'suspended') {
-      audioSystem.sound.context.resume();
-    }
-    
-    // Запускаем фоновую музыку, если нужно
-    if (!gameState.audioInitialized) {
-      audioSystem.ambientMusic.tracks['room'].play();
-      gameState.audioInitialized = true;
-    }
-    
-    document.removeEventListener('click', handleFirstInteraction);
-    document.removeEventListener('touchstart', handleFirstInteraction);
-  };
-
-  document.addEventListener('click', handleFirstInteraction);
-  document.addEventListener('touchstart', handleFirstInteraction);
-
-  // Обработчики событий
-  document.addEventListener('click', () => {
-    if (audioSystem.sound.context.state === 'suspended') {
-      audioSystem.sound.context.resume();
-    }
-  }, { once: true });
-
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    DitherShader.uniforms.resolution.value.set(window.innerWidth, window.innerHeight);
-  });
-
-  window.addEventListener('pagehide', () => {
-    if (audioSystem.sound.context && audioSystem.sound.context.state !== 'closed') {
-      audioSystem.sound.context.close();
-    }
-  });
-
-  window.addEventListener('beforeunload', () => {
-    if (audioSystem.sound && audioSystem.sound.isPlaying) {
-      audioSystem.sound.stop();
-    }
-  });
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-      if (audioSystem.sound && audioSystem.sound.isPlaying) {
-        audioSystem.sound.pause();
-      }
-      audioSystem.stepSounds.forEach(sound => {
-        if (sound && sound.isPlaying) sound.stop();
-      });
-    }
-  });
-
-  if (window.Telegram && Telegram.WebApp) {
-    Telegram.WebApp.onEvent('close', () => {
-      if (audioSystem.sound && audioSystem.sound.isPlaying) {
-        audioSystem.sound.stop();
-      }
-    });
-  }
-
-  // Стартовый экран
   const startScreen = document.getElementById('start-screen');
   const startButton = document.getElementById('start-button');
 
-  startButton.addEventListener('click', () => {
+  const handleStartGame = () => {
     startScreen.style.display = 'none';
     gameState.gameStarted = true;
 
-    // phoneSystem.init();
+    audioSystem.init();
+    
+    setTimeout(() => {
+      if (audioSystem.ambientMusic.tracks['room']) {
+        audioSystem.ambientMusic.tracks['room'].setVolume(SETTINGS.ambientMusic.room.volume);
+        audioSystem.ambientMusic.tracks['room'].play();
+      }
+    }, 500);
+
     zoneSystem.init();
     setTimeout(() => {
       phoneSystem.startCall();
     }, SETTINGS.startPhone.startRingingDelay);
-  });
+  };
 
+  startButton.addEventListener('click', handleStartGame);
   startButton.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    startScreen.style.display = 'none';
-    gameState.gameStarted = true;
-
-    // phoneSystem.init();
-    zoneSystem.init();
-    setTimeout(() => {
-      phoneSystem.startCall();
-    }, SETTINGS.startPhone.startRingingDelay);
+    handleStartGame();
   });
-
 }
 
 let lastFrameTime = 0;
@@ -1400,7 +1266,9 @@ const phoneSystem = {
       }
     });
   },
-  startCall: function () {
+  startCall: function() {
+    if (!gameState.gameStarted) return; // Не звоним, если игра не начата
+    
     if (this.phoneSound && !this.phoneSound.isPlaying) {
       this.phoneSound.play();
       if (this.phoneObject) {
@@ -1422,18 +1290,8 @@ const phoneSystem = {
 initGame();
 gameLoop();
 
-if (window.Telegram && Telegram.WebApp) {
-  Telegram.WebApp.expand(); // Раскрываем на весь экран
-  Telegram.WebApp.enableClosingConfirmation(); // Подтверждение закрытия
-  
-  // Фикс звука для iOS в Telegram
-  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-    const audioContextFix = new (window.AudioContext || window.webkitAudioContext)();
-    const emptyBuffer = audioContextFix.createBuffer(1, 1, 22050);
-    const source = audioContextFix.createBufferSource();
-    source.buffer = emptyBuffer;
-    source.connect(audioContextFix.destination);
-    source.start(0);
-    source.stop(0.01);
+document.addEventListener('click', () => {
+  if (audioSystem.sound.context.state === 'suspended') {
+    audioSystem.sound.context.resume();
   }
-}
+}, { once: true });
