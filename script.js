@@ -121,6 +121,13 @@ const audioSystem = {
     this.loadAmbientMusic();
     this.loadStepSounds();
     this.loadDoorSounds();
+
+    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      this.sound.setVolume(0); // Начинаем с нулевой громкости
+      setTimeout(() => {
+        this.sound.setVolume(SETTINGS.musicVolume);
+      }, 1000);
+    }
   },
 
   loadMusic: function () {
@@ -1078,6 +1085,25 @@ function initGame() {
   introSystem.init();
   levelSystem.load();
 
+  const handleFirstInteraction = () => {
+    // Запускаем звуковую систему
+    if (audioSystem.sound.context.state === 'suspended') {
+      audioSystem.sound.context.resume();
+    }
+    
+    // Запускаем фоновую музыку, если нужно
+    if (!gameState.audioInitialized) {
+      audioSystem.ambientMusic.tracks['room'].play();
+      gameState.audioInitialized = true;
+    }
+    
+    document.removeEventListener('click', handleFirstInteraction);
+    document.removeEventListener('touchstart', handleFirstInteraction);
+  };
+
+  document.addEventListener('click', handleFirstInteraction);
+  document.addEventListener('touchstart', handleFirstInteraction);
+
   // Обработчики событий
   document.addEventListener('click', () => {
     if (audioSystem.sound.context.state === 'suspended') {
@@ -1340,3 +1366,19 @@ const phoneSystem = {
 // Запуск игры
 initGame();
 gameLoop();
+
+if (window.Telegram && Telegram.WebApp) {
+  Telegram.WebApp.expand(); // Раскрываем на весь экран
+  Telegram.WebApp.enableClosingConfirmation(); // Подтверждение закрытия
+  
+  // Фикс звука для iOS в Telegram
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    const audioContextFix = new (window.AudioContext || window.webkitAudioContext)();
+    const emptyBuffer = audioContextFix.createBuffer(1, 1, 22050);
+    const source = audioContextFix.createBufferSource();
+    source.buffer = emptyBuffer;
+    source.connect(audioContextFix.destination);
+    source.start(0);
+    source.stop(0.01);
+  }
+}
