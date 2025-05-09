@@ -565,7 +565,7 @@ const playerSystem = {
     }
 
     if (joystickData.right.active) {
-      this.cameraAngle += joystickData.right.x * SETTINGS.rotationSpeed * 2;
+      this.cameraAngle -= joystickData.right.x * SETTINGS.rotationSpeed * 2;
     }
 
     this.updateCamera();
