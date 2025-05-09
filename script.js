@@ -1176,15 +1176,6 @@ function initGame() {
     }, SETTINGS.startPhone.startRingingDelay);
   });
 
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      introSystem.skipToNextPhrase();
-    }
-  });
-
-  document.getElementById('start-screen').addEventListener('click', () => {
-    introSystem.skipToNextPhrase();
-  });
 }
 
 let lastFrameTime = 0;
@@ -1248,6 +1239,12 @@ const introSystem = {
         border-radius: 5px;
       ">НАЧАТЬ ДЕНЬ</button>
     `;
+
+    startScreen.addEventListener('click', () => this.skipToNextPhrase());
+    startScreen.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.skipToNextPhrase();
+    });
 
     this.startTyping();
   },
