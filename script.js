@@ -116,17 +116,34 @@ const audioSystem = {
     toTrack: null
   },
 
-  init: function () {
-    this.loadMusic();
-    this.loadAmbientMusic();
-    this.loadStepSounds();
-    this.loadDoorSounds();
-
+  init: function() {
+    // Фикс для iOS
     if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-      this.sound.setVolume(0); // Начинаем с нулевой громкости
+      // Создаем пустой звук для разблокировки
+      const context = new (window.AudioContext || window.webkitAudioContext)();
+      const source = context.createBufferSource();
+      source.buffer = context.createBuffer(1, 1, 22050);
+      source.connect(context.destination);
+      source.start(0);
+      source.stop(0.1);
+      
+      // Задержка для инициализации
       setTimeout(() => {
-        this.sound.setVolume(SETTINGS.musicVolume);
-      }, 1000);
+        this.loadMusic();
+        this.loadAmbientMusic();
+        this.loadStepSounds();
+        this.loadDoorSounds();
+        
+        // Устанавливаем нулевую громкость и постепенно увеличиваем
+        this.sound.setVolume(0);
+        setTimeout(() => this.sound.setVolume(SETTINGS.musicVolume), 1000);
+      }, 300);
+    } else {
+      // Стандартная инициализация для других платформ
+      this.loadMusic();
+      this.loadAmbientMusic();
+      this.loadStepSounds();
+      this.loadDoorSounds();
     }
   },
 
@@ -190,21 +207,23 @@ const audioSystem = {
     }
   },
 
-  loadAmbientMusic: function () {
+  loadAmbientMusic: function() {
     SETTINGS.zones.forEach(zone => {
       audioLoader.load(SETTINGS.ambientMusic[zone].path, (buffer) => {
         const sound = new THREE.Audio(audioListener);
         sound.setBuffer(buffer);
         sound.setLoop(true);
-        sound.setVolume(0);
-        sound.zone = zone; // сохраняем имя зоны в аудиообъекте
-        this.ambientMusic.tracks[zone] = sound;
-
-        // Автозапуск музыки комнаты
-        if (zone === 'room') {
-          sound.setVolume(SETTINGS.ambientMusic.room.volume);
-          sound.play();
+        sound.setVolume(zone === 'room' ? SETTINGS.ambientMusic[zone].volume : 0);
+        
+        // Фикс для iOS - запускаем и сразу приостанавливаем
+        if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+          sound.play().then(() => {
+            sound.pause();
+            if (zone === 'room') sound.play();
+          }).catch(e => console.log('Audio play error:', e));
         }
+        
+        this.ambientMusic.tracks[zone] = sound;
       });
     });
   },
@@ -1078,12 +1097,51 @@ const zoneSystem = {
 // Инициализация игры
 function initGame() {
   // Инициализация систем
-  audioSystem.init();
   postProcessingSystem.init();
   playerSystem.loadPlayerModel();
   controlSystem.init();
   introSystem.init();
   levelSystem.load();
+
+  // Фикс для iOS
+  const unlockAudio = () => {
+    if (!gameState.audioInitialized) {
+      // Создаем и сразу останавливаем пустой звук
+      const context = new (window.AudioContext || window.webkitAudioContext)();
+      const source = context.createBufferSource();
+      source.buffer = context.createBuffer(1, 1, 22050);
+      source.connect(context.destination);
+      source.start(0);
+      source.stop(0.1);
+      
+      // Инициализируем звуковую систему
+      audioSystem.init();
+      
+      // Запускаем фоновую музыку
+      setTimeout(() => {
+        if (audioSystem.ambientMusic.tracks['room']) {
+          audioSystem.ambientMusic.tracks['room'].play();
+        }
+      }, 500);
+      
+      gameState.audioInitialized = true;
+      
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+    }
+  };
+
+  // Вешаем обработчики на разные события
+  document.addEventListener('click', unlockAudio);
+  document.addEventListener('touchstart', unlockAudio);
+  document.addEventListener('keydown', unlockAudio);
+  
+  // Для Telegram WebApp
+  if (window.Telegram && Telegram.WebApp) {
+    Telegram.WebApp.expand();
+    Telegram.WebApp.enableClosingConfirmation();
+    Telegram.WebApp.onEvent('viewportChanged', unlockAudio);
+  }
 
   const handleFirstInteraction = () => {
     // Запускаем звуковую систему
