@@ -116,23 +116,14 @@ const audioSystem = {
     toTrack: null
   },
 
-  init: function() {
+  init: function () {
     // Только загрузка, без воспроизведения
-    this.loadMusic();
-    this.loadAmbientMusic();
+    // this.loadAmbientMusic();
     this.loadStepSounds();
     this.loadDoorSounds();
-    
+
     // Начинаем с нулевой громкости
     this.sound.setVolume(0);
-  },
-
-  loadMusic: function () {
-    audioLoader.load('assets/audio/music/platformer_1_underscore_modern.wav', (buffer) => {
-      this.sound.setBuffer(buffer);
-      this.sound.setLoop(true);
-      this.sound.setVolume(SETTINGS.musicVolume);
-    });
   },
 
   loadStepSounds: function () {
@@ -186,18 +177,23 @@ const audioSystem = {
       stepSound.play();
     }
   },
-  
-  loadAmbientMusic: function() {
-    SETTINGS.zones.forEach(zone => {
-      audioLoader.load(SETTINGS.ambientMusic[zone].path, (buffer) => {
-        const sound = new THREE.Audio(audioListener);
-        sound.setBuffer(buffer);
-        sound.setLoop(true);
-        sound.setVolume(0); // Начинаем с нулевой громкости
-        sound.zone = zone;
-        this.ambientMusic.tracks[zone] = sound;
+
+  loadAmbientMusic: function () {
+    const promises = SETTINGS.zones.map(zone => {
+      return new Promise((resolve) => {
+        audioLoader.load(SETTINGS.ambientMusic[zone].path, (buffer) => {
+          const sound = new THREE.Audio(audioListener);
+          sound.setBuffer(buffer);
+          sound.setLoop(true);
+          sound.setVolume(0);
+          sound.zone = zone;
+          this.ambientMusic.tracks[zone] = sound;
+          resolve();
+        });
       });
     });
+
+    return Promise.all(promises);
   },
 
   switchToZone: function (newZone) {
@@ -573,7 +569,6 @@ const playerSystem = {
       if (distance < closestDistance) {
         closestDistance = distance;
         closestObject = obj;
-        // console.log("closest object " + obj + " distance " + distance);
       }
     });
 
@@ -1077,24 +1072,28 @@ function initGame() {
   const startButton = document.getElementById('start-button');
 
   const handleStartGame = () => {
+    resumeAudioContext(); // ВАЖНО: разблокируем аудио
+
     startScreen.style.display = 'none';
     gameState.gameStarted = true;
 
-    audioSystem.init();
-    
-    setTimeout(() => {
-      if (audioSystem.ambientMusic.tracks['room']) {
-        audioSystem.ambientMusic.tracks['room'].setVolume(SETTINGS.ambientMusic.room.volume);
-        audioSystem.ambientMusic.tracks['room'].play();
-      }
-    }, 500);
+    audioSystem.init(); // Загружаем, но не проигрываем
 
+    // Явное воспроизведение первой фоновой музыки (в зоне room)
+    audioSystem.loadAmbientMusic().then(() => {
+      const roomMusic = audioSystem.ambientMusic.tracks['room'];
+      if (roomMusic && !roomMusic.isPlaying) {
+        roomMusic.setVolume(SETTINGS.ambientMusic.room.volume);
+        roomMusic.play();
+      }
+    });
+
+    // Не зависит от загрузки — можно запускать сразу
+    phoneSystem.startCall();
     zoneSystem.init();
-    setTimeout(() => {
-      phoneSystem.startCall();
-    }, SETTINGS.startPhone.startRingingDelay);
   };
 
+  // Обработчики событий нажатия кнопки
   startButton.addEventListener('click', handleStartGame);
   startButton.addEventListener('touchstart', (e) => {
     e.preventDefault();
@@ -1266,9 +1265,9 @@ const phoneSystem = {
       }
     });
   },
-  startCall: function() {
+  startCall: function () {
     if (!gameState.gameStarted) return; // Не звоним, если игра не начата
-    
+
     if (this.phoneSound && !this.phoneSound.isPlaying) {
       this.phoneSound.play();
       if (this.phoneObject) {
@@ -1295,3 +1294,10 @@ document.addEventListener('click', () => {
     audioSystem.sound.context.resume();
   }
 }, { once: true });
+
+function resumeAudioContext() {
+  const ctx = audioSystem.sound.context;
+  if (ctx.state === 'suspended') {
+    ctx.resume();
+  }
+}

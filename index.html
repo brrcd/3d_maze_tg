@@ -44,43 +44,6 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/RenderPass.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/ShaderPass.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/shaders/CopyShader.min.js"></script>
-  <div id="unmute-btn" style="
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 10px 15px;
-  background: rgba(0,0,0,0.5);
-  color: white;
-  border-radius: 5px;
-  z-index: 1000;
-  display: none;
-">Включить звук</div>
-
-<script>
-  // Показываем кнопку на iOS
-  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-    document.getElementById('unmute-btn').style.display = 'block';
-    
-    document.getElementById('unmute-btn').addEventListener('click', function() {
-      // Создаем и сразу останавливаем пустой звук
-      const context = new (window.AudioContext || window.webkitAudioContext)();
-      const source = context.createBufferSource();
-      source.buffer = context.createBuffer(1, 1, 22050);
-      source.connect(context.destination);
-      source.start(0);
-      source.stop(0.1);
-      
-      // Запускаем звук игры
-      if (window.audioSystem) {
-        audioSystem.sound.context.resume();
-        audioSystem.ambientMusic.tracks['room'].play();
-      }
-      
-      this.textContent = 'Звук включен!';
-      setTimeout(() => this.style.display = 'none', 2000);
-    });
-  }
-</script>
   <script src="script.js"></script>
 </body>
 
