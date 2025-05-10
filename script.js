@@ -128,14 +128,14 @@ const audioSystem = {
 
   loadStepSounds: function () {
     const stepSoundPaths = [
-      'assets/audio/steps/step_wood_1.ogg',
-      'assets/audio/steps/step_wood_2.ogg',
-      'assets/audio/steps/step_wood_3.ogg',
-      'assets/audio/steps/step_wood_4.ogg',
-      'assets/audio/steps/step_wood_5.ogg',
-      'assets/audio/steps/step_wood_6.ogg',
-      'assets/audio/steps/step_wood_7.ogg',
-      'assets/audio/steps/step_wood_8.ogg'
+      'assets/audio/steps/step_wood_1.mp3',
+      'assets/audio/steps/step_wood_2.mp3',
+      'assets/audio/steps/step_wood_3.mp3',
+      'assets/audio/steps/step_wood_4.mp3',
+      'assets/audio/steps/step_wood_5.mp3',
+      'assets/audio/steps/step_wood_6.mp3',
+      'assets/audio/steps/step_wood_7.mp3',
+      'assets/audio/steps/step_wood_8.mp3'
     ];
 
     stepSoundPaths.forEach((path, index) => {
@@ -1078,6 +1078,7 @@ function initGame() {
     gameState.gameStarted = true;
 
     audioSystem.init(); // Загружаем, но не проигрываем
+    phoneSystem.init();
 
     // Явное воспроизведение первой фоновой музыки (в зоне room)
     audioSystem.loadAmbientMusic().then(() => {
@@ -1089,7 +1090,9 @@ function initGame() {
     });
 
     // Не зависит от загрузки — можно запускать сразу
-    phoneSystem.startCall();
+    setTimeout(() => {
+      phoneSystem.startCall();
+    }, SETTINGS.startPhone.startRingingDelay);
     zoneSystem.init();
   };
 
@@ -1267,7 +1270,6 @@ const phoneSystem = {
   },
   startCall: function () {
     if (!gameState.gameStarted) return; // Не звоним, если игра не начата
-
     if (this.phoneSound && !this.phoneSound.isPlaying) {
       this.phoneSound.play();
       if (this.phoneObject) {
