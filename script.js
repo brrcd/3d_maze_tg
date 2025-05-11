@@ -287,7 +287,7 @@ const audioSystem = {
 
     let closestObject = null;
     let closestDistance = Infinity;
-    let targetVolume = 1;
+    let targetVolume = 0.11;
 
     this.soundObjects.forEach(soundObj => {
       if (!soundObj.object || !soundObj.sound) return;
