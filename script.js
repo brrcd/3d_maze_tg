@@ -1,4 +1,3 @@
-// Основные настройки и константы
 const SETTINGS = {
   movementSpeed: 0.1,
   rotationSpeed: 0.03,
@@ -34,12 +33,18 @@ const SETTINGS = {
       path: 'assets/audio/ambient/forest.mp3',
       volume: 0.3
     },
-    fadeDuration: 2.0 // продолжительность перехода в секундах
+    fadeDuration: 2.0
   },
-  zones: ['room', 'corridor', 'forest'] // последовательность зон
+  zones: ['room', 'corridor', 'forest'],
+  soundObjects: {
+    activationDistance: 5,
+    fullVolumeDistance: 3,
+    deactivationDistance: 7,
+    fadeSpeed: 0.1,
+    maxVolume: 1
+  },
 };
 
-// Инициализация сцены и рендерера
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
 
@@ -53,7 +58,6 @@ renderer.outputEncoding = THREE.LinearEncoding;
 renderer.toneMapping = THREE.NoToneMapping;
 document.body.appendChild(renderer.domElement);
 
-// Основные системы
 const textureLoader = new THREE.TextureLoader();
 const gltfLoader = new THREE.GLTFLoader();
 const fbxLoader = new THREE.FBXLoader();
@@ -61,14 +65,16 @@ const audioLoader = new THREE.AudioLoader();
 const clock = new THREE.Clock();
 const audioListener = new THREE.AudioListener();
 
-// Камера
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.add(audioListener);
 
-// Освещение
 scene.add(new THREE.AmbientLight(0xFFFFFF));
+const debugSphere = new THREE.Mesh(
+  new THREE.SphereGeometry(0.5),
+  new THREE.MeshBasicMaterial({ color: 0xff0000 })
+);
+scene.add(debugSphere);
 
-// Состояние игры
 const gameState = {
   playerReady: false,
   levelLoaded: false,
@@ -76,7 +82,6 @@ const gameState = {
   gameStarted: false
 };
 
-// Управление
 const keyboardState = {
   KeyW: false,
   KeyA: false,
@@ -89,13 +94,11 @@ const joystickData = {
   right: { x: 0, y: 0, active: false }
 };
 
-// Коллекции объектов
 const collidableObjects = [];
 const interactableObjects = [];
 const doors = [];
 const collisionHelpers = [];
 
-// Аудио
 const audioSystem = {
   sound: new THREE.Audio(audioListener),
   stepSounds: [],
@@ -108,21 +111,21 @@ const audioSystem = {
   currentTargetVolume: null,
   volumeTweenInterval: null,
   ambientMusic: {
-    currentZone: 'room', // начинаем в комнате
+    currentZone: 'room',
     tracks: {},
     transitionStartTime: 0,
     isTransitioning: false,
     fromTrack: null,
     toTrack: null
   },
+  soundObjects: [],
+  activeSoundObject: null,
+  currentSoundVolume: 0,
 
   init: function () {
-    // Только загрузка, без воспроизведения
-    // this.loadAmbientMusic();
     this.loadStepSounds();
     this.loadDoorSounds();
 
-    // Начинаем с нулевой громкости
     this.sound.setVolume(0);
   },
 
@@ -199,15 +202,12 @@ const audioSystem = {
   switchToZone: function (newZone) {
     if (this.ambientMusic.currentZone === newZone || this.ambientMusic.isTransitioning) return;
 
-    console.log(`Переключаем музыку с ${this.ambientMusic.currentZone} на ${newZone}`);
-
     this.ambientMusic.isTransitioning = true;
     this.ambientMusic.transitionStartTime = Date.now();
     this.ambientMusic.fromTrack = this.ambientMusic.tracks[this.ambientMusic.currentZone];
     this.ambientMusic.toTrack = this.ambientMusic.tracks[newZone];
     this.ambientMusic.currentZone = newZone;
 
-    // Если трек еще не играет, запускаем его
     if (!this.ambientMusic.toTrack.isPlaying) {
       this.ambientMusic.toTrack.play();
     }
@@ -219,21 +219,129 @@ const audioSystem = {
     const elapsed = (Date.now() - this.ambientMusic.transitionStartTime) / 1000;
     const progress = Math.min(elapsed / SETTINGS.ambientMusic.fadeDuration, 1);
 
-    // Плавное уменьшение громкости предыдущего трека
     if (this.ambientMusic.fromTrack) {
       const fromVolume = SETTINGS.ambientMusic[this.ambientMusic.fromTrack.zone].volume;
       this.ambientMusic.fromTrack.setVolume(THREE.MathUtils.lerp(fromVolume, 0, progress));
     }
 
-    // Плавное увеличение громкости нового трека
     const toVolume = SETTINGS.ambientMusic[this.ambientMusic.toTrack.zone].volume;
     this.ambientMusic.toTrack.setVolume(THREE.MathUtils.lerp(0, toVolume, progress));
 
-    // Завершение перехода
     if (progress >= 1) {
       this.ambientMusic.isTransitioning = false;
       if (this.ambientMusic.fromTrack) {
-        this.ambientMusic.fromTrack.pause(); // Останавливаем предыдущий трек
+        this.ambientMusic.fromTrack.pause();
+      }
+    }
+  },
+
+  addSoundObject: function (object, id) {
+    let soundPath;
+    switch (id) {
+      case 0: soundPath = "assets/audio/music/test_song_1.wav";
+      case 1: soundPath = "assets/audio/music/test_song_1.wav";
+      case 2: soundPath = "assets/audio/music/test_song_1.wav";
+      default: soundPath = "assets/audio/music/test_song_1.wav";
+    }
+
+    return new Promise((resolve, reject) => {
+      audioLoader.load(soundPath,
+        (buffer) => {
+
+          const sound = new THREE.PositionalAudio(audioListener);
+          sound.setBuffer(buffer);
+          sound.setRefDistance(1);
+          sound.setLoop(true);
+          sound.setVolume(0);
+
+          if (!object || !object.isObject3D) {
+            console.error("Объект не существует или не является Object3D");
+            return reject("Invalid object");
+          }
+
+          object.add(sound);
+          object.userData.soundVolume = SETTINGS.soundObjects.maxVolume;
+
+          const soundObj = {
+            object: object,
+            sound: sound,
+            isPlaying: false
+          };
+
+          this.soundObjects.push(soundObj);
+          resolve(soundObj);
+        },
+        undefined,
+        (error) => {
+          console.error("Ошибка загрузки аудио:", error);
+          reject(error);
+        }
+      );
+    });
+  },
+
+  updateSoundObjects: function (playerPosition) {
+    this.soundObjects = this.soundObjects.filter(soundObj =>
+      soundObj && soundObj.object && soundObj.sound
+    );
+
+    let closestObject = null;
+    let closestDistance = Infinity;
+    let targetVolume = 1;
+
+    this.soundObjects.forEach(soundObj => {
+      if (!soundObj.object || !soundObj.sound) return;
+
+      const distance = playerPosition.distanceTo(soundObj.object.position);
+
+      if (distance < SETTINGS.soundObjects.deactivationDistance && distance < closestDistance) {
+        closestDistance = distance;
+        closestObject = soundObj;
+      }
+    });
+
+    if (closestObject) {
+      if (closestDistance <= SETTINGS.soundObjects.fullVolumeDistance) {
+        targetVolume = closestObject.object.userData.soundVolume;
+      } else if (closestDistance <= SETTINGS.soundObjects.activationDistance) {
+        const fadeRange = SETTINGS.soundObjects.activationDistance - SETTINGS.soundObjects.fullVolumeDistance;
+        const fadeDistance = closestDistance - SETTINGS.soundObjects.fullVolumeDistance;
+        targetVolume = closestObject.object.userData.soundVolume * (1 - (fadeDistance / fadeRange));
+      };
+    }
+
+    const volumeDiff = targetVolume - this.currentSoundVolume;
+    if (Math.abs(volumeDiff) > 0.01) {
+      this.currentSoundVolume += volumeDiff * SETTINGS.soundObjects.fadeSpeed;
+    } else {
+      this.currentSoundVolume = targetVolume;
+    }
+
+    if (this.activeSoundObject !== closestObject) {
+      if (this.activeSoundObject && this.activeSoundObject.sound && this.activeSoundObject.isPlaying) {
+        this.activeSoundObject.sound.stop();
+        this.activeSoundObject.isPlaying = false;
+      }
+
+      if (closestObject && closestObject.sound && this.currentSoundVolume > 0.01) {
+        try {
+          closestObject.sound.play();
+          closestObject.isPlaying = true;
+        } catch (e) {
+          closestObject.isPlaying = false;
+        }
+      }
+
+      this.activeSoundObject = closestObject;
+    }
+
+    if (this.activeSoundObject && this.activeSoundObject.sound) {
+      this.activeSoundObject.sound.setVolume(this.currentSoundVolume);
+
+      if (this.currentSoundVolume <= 0.01 && this.activeSoundObject.isPlaying) {
+        this.activeSoundObject.sound.stop();
+        this.activeSoundObject.isPlaying = false;
+        this.activeSoundObject = null;
       }
     }
   },
@@ -265,7 +373,6 @@ const audioSystem = {
   }
 };
 
-// Система анимации
 const animationSystem = {
   mixer: null,
   animations: {},
@@ -297,7 +404,6 @@ const animationSystem = {
   }
 };
 
-// Система коллизий
 const collisionSystem = {
   checkCollision: function (position) {
     if (!gameState.playerReady) return { collision: false, slideVector: new THREE.Vector3() };
@@ -374,7 +480,6 @@ const collisionSystem = {
   }
 };
 
-// Система управления игроком
 const playerSystem = {
   player: null,
   cameraAngle: 0,
@@ -594,8 +699,6 @@ const playerSystem = {
       this.toggleDoor(this.currentInteractable);
     } else if (this.currentInteractable.userData.isRinging) {
       phoneSystem.stopCall();
-      // Здесь можно добавить логику ответа на звонок
-      console.log("Звонок принят!");
     }
   },
 
@@ -684,7 +787,6 @@ const playerSystem = {
   }
 };
 
-// Система джойстиков
 const joystickSystem = {
   init: function () {
     this.setupJoystick(document.getElementById('left-joystick'), 'left');
@@ -814,7 +916,6 @@ const joystickSystem = {
   }
 };
 
-// Система пост-обработки
 const postProcessingSystem = {
   composer: null,
 
@@ -848,7 +949,6 @@ const postProcessingSystem = {
   }
 };
 
-// Шейдер для дизеринга
 const DitherShader = {
   uniforms: {
     tDiffuse: { value: null },
@@ -888,7 +988,6 @@ const DitherShader = {
   `
 };
 
-// Система управления
 const controlSystem = {
   init: function () {
     this.setKeyboardListeners();
@@ -938,7 +1037,6 @@ const controlSystem = {
   }
 };
 
-// Система загрузки уровня
 const levelSystem = {
   load: function () {
     if (gameState.levelLoaded) return;
@@ -969,7 +1067,6 @@ const levelSystem = {
             child.geometry.attributes.uv.needsUpdate = true;
           }
 
-          // Используем один материал для всех
           child.material = new THREE.MeshStandardMaterial({
             map: woodTexture,
             roughness: 0.8,
@@ -992,6 +1089,15 @@ const levelSystem = {
           child.userData.isClosed = true;
           collidableObjects.push(child);
         }
+
+        if (child.userData?.isSoundObject) {
+          audioSystem.addSoundObject(
+            child,
+            child.userData.id
+          ).catch(e => {
+            console.error("Ошибка создания звукового объекта:", e);
+          });
+        }
       });
 
       if (gameState.showCollisionDebug) {
@@ -1004,9 +1110,9 @@ const levelSystem = {
 };
 
 const zoneSystem = {
-  triggers: [], // Массив всех триггеров
-  lastTrigger: null, // Последний активированный триггер
-  lastTriggerTime: 0, // Время последней активации
+  triggers: [],
+  lastTrigger: null,
+  lastTriggerTime: 0,
 
   init: function () {
     this.findTriggers();
@@ -1018,7 +1124,6 @@ const zoneSystem = {
         child.box3 = new THREE.Box3().setFromObject(child);
         child.visible = false;
         this.triggers.push(child);
-        console.log(`Найден триггер между ${child.userData.zoneA} и ${child.userData.zoneB}`);
       }
     });
   },
@@ -1027,7 +1132,6 @@ const zoneSystem = {
     if (!gameState.playerReady) return;
 
     const now = Date.now();
-    // Защита от частых срабатываний (минимум 1 секунда между переключениями)
     if (now - this.lastTriggerTime < 1000) return;
 
     const playerSize = new THREE.Vector3(0.8, 1.5, 0.8);
@@ -1055,8 +1159,6 @@ const zoneSystem = {
     } else {
       return;
     }
-
-    console.log(`Переход из ${fromZone} в ${toZone}`);
     audioSystem.switchToZone(toZone);
   }
 };
@@ -1072,15 +1174,14 @@ function initGame() {
   const startButton = document.getElementById('start-button');
 
   const handleStartGame = () => {
-    resumeAudioContext(); // ВАЖНО: разблокируем аудио
+    resumeAudioContext();
 
     startScreen.style.display = 'none';
     gameState.gameStarted = true;
 
-    audioSystem.init(); // Загружаем, но не проигрываем
-    phoneSystem.init();
+    audioSystem.init();
+    // phoneSystem.init();
 
-    // Явное воспроизведение первой фоновой музыки (в зоне room)
     audioSystem.loadAmbientMusic().then(() => {
       const roomMusic = audioSystem.ambientMusic.tracks['room'];
       if (roomMusic && !roomMusic.isPlaying) {
@@ -1089,14 +1190,12 @@ function initGame() {
       }
     });
 
-    // Не зависит от загрузки — можно запускать сразу
     setTimeout(() => {
       phoneSystem.startCall();
     }, SETTINGS.startPhone.startRingingDelay);
     zoneSystem.init();
   };
 
-  // Обработчики событий нажатия кнопки
   startButton.addEventListener('click', handleStartGame);
   startButton.addEventListener('touchstart', (e) => {
     e.preventDefault();
@@ -1123,10 +1222,17 @@ function gameLoop(currentTime) {
     playerSystem.handleMovement();
     playerSystem.updateCamera();
     playerSystem.checkInteractableProximity();
-    zoneSystem.checkPlayerPosition(playerSystem.player.position); // Проверяем переходы
+    zoneSystem.checkPlayerPosition(playerSystem.player.position);
+    audioSystem.updateSoundObjects(playerSystem.player.position);
+  }
+  if (audioSystem.activeSoundObject) {
+    debugSphere.position.copy(audioSystem.activeSoundObject.object.position);
+    debugSphere.visible = true;
+  } else {
+    debugSphere.visible = false;
   }
 
-  audioSystem.updateMusicTransition(); // Обновляем переходы музыки
+  audioSystem.updateMusicTransition();
 
   postProcessingSystem.composer.render();
 }
@@ -1180,7 +1286,6 @@ const introSystem = {
     const startButton = document.getElementById('start-button');
 
     if (this.currentPhraseIndex >= SETTINGS.introPhrases.length) {
-      // Все фразы показаны - показываем кнопку
       textElement.style.display = 'none';
       startButton.style.display = 'block';
       return;
@@ -1200,12 +1305,10 @@ const introSystem = {
         clearInterval(this.typingInterval);
         this.isTyping = false;
 
-        // Показываем кнопку после последней фразы
         if (this.currentPhraseIndex === SETTINGS.introPhrases.length - 1) {
           startButton.style.display = 'block';
         }
 
-        // Переход к следующей фразе после задержки
         setTimeout(() => {
           if (this.currentPhraseIndex < SETTINGS.introPhrases.length - 1) {
             textElement.textContent = '';
@@ -1222,15 +1325,12 @@ const introSystem = {
       clearInterval(this.typingInterval);
       this.isTyping = false;
 
-      // Показываем полную текущую фразу
       const textElement = document.getElementById('intro-text');
       textElement.textContent = SETTINGS.introPhrases[this.currentPhraseIndex];
 
-      // Если это последняя фраза - показываем кнопку
       if (this.currentPhraseIndex === SETTINGS.introPhrases.length - 1) {
         document.getElementById('start-button').style.display = 'block';
       } else {
-        // Через короткую задержку переходим к следующей фразе
         setTimeout(() => {
           textElement.textContent = '';
           this.currentPhraseIndex++;
@@ -1241,7 +1341,6 @@ const introSystem = {
   }
 };
 
-// Система телефонных звонков
 const phoneSystem = {
   phoneObject: null,
   phoneSound: null,
@@ -1269,7 +1368,7 @@ const phoneSystem = {
     });
   },
   startCall: function () {
-    if (!gameState.gameStarted) return; // Не звоним, если игра не начата
+    if (!gameState.gameStarted) return;
     if (this.phoneSound && !this.phoneSound.isPlaying) {
       this.phoneSound.play();
       if (this.phoneObject) {
@@ -1287,7 +1386,6 @@ const phoneSystem = {
   }
 };
 
-// Запуск игры
 initGame();
 gameLoop();
 
