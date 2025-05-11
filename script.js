@@ -796,7 +796,6 @@ const joystickSystem = {
   setupJoystick: function (joystickElement, type) {
     const area = joystickElement.querySelector('.joystick-area');
     const thumb = joystickElement.querySelector('.joystick-thumb');
-    const isHorizontalOnly = type === 'right';
 
     let activeTouchId = null;
     let maxDist = 0;
@@ -804,7 +803,7 @@ const joystickSystem = {
 
     const initSizes = () => {
       const rect = area.getBoundingClientRect();
-      maxDist = isHorizontalOnly ? rect.width / 2.5 : rect.width / 2.2;
+      maxDist = rect.width / 2.2;
       baseRect = {
         left: rect.left,
         top: rect.top,
@@ -823,10 +822,6 @@ const joystickSystem = {
       let x = clientX - baseRect.centerX;
       let y = clientY - baseRect.centerY;
 
-      if (isHorizontalOnly) {
-        y = 0;
-      }
-
       const dist = Math.min(Math.sqrt(x * x + y * y), maxDist);
       const angle = Math.atan2(y, x);
 
@@ -834,7 +829,7 @@ const joystickSystem = {
       const ny = dist * Math.sin(angle);
 
       joystickData[type].x = nx / maxDist;
-      joystickData[type].y = isHorizontalOnly ? 0 : -ny / maxDist;
+      joystickData[type].y = -ny / maxDist;
       joystickData[type].active = true;
 
       if (isStart) {
