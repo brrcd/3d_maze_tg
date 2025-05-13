@@ -5,7 +5,6 @@ const SETTINGS = {
   cameraHeight: 3,
   interactionDistance: 2.5,
   ditherPixelSize: 3,
-  stepSoundVolume: 0.3,
   doorSoundVolume: 0.5,
   musicVolume: 0.001,
   introPhrases: [
@@ -23,15 +22,15 @@ const SETTINGS = {
   ambientMusic: {
     room: {
       path: 'assets/audio/ambient/room.mp3',
-      volume: 0.3
+      volume: 0.2
     },
     corridor: {
       path: 'assets/audio/ambient/corridor.mp3',
-      volume: 0.3
+      volume: 0.2
     },
     forest: {
       path: 'assets/audio/ambient/forest.mp3',
-      volume: 0.3
+      volume: 0.2
     },
     fadeDuration: 2.0
   },
@@ -42,6 +41,36 @@ const SETTINGS = {
     deactivationDistance: 7,
     fadeSpeed: 0.1,
     maxVolume: 1
+  },
+  stepSoundVolumes: {
+    wood: 0.3,
+    forest: 0.3
+  },
+  stepSoundPaths: {
+    wood: [
+      'assets/audio/steps/step_wood_1.mp3',
+      'assets/audio/steps/step_wood_2.mp3',
+      'assets/audio/steps/step_wood_3.mp3',
+      'assets/audio/steps/step_wood_4.mp3',
+      'assets/audio/steps/step_wood_5.mp3',
+      'assets/audio/steps/step_wood_6.mp3',
+      'assets/audio/steps/step_wood_7.mp3',
+      'assets/audio/steps/step_wood_8.mp3'
+    ],
+    forest: [
+      'assets/audio/steps/step_leaves_1.mp3',
+      'assets/audio/steps/step_leaves_2.mp3',
+      'assets/audio/steps/step_leaves_3.mp3',
+      'assets/audio/steps/step_leaves_4.mp3',
+      'assets/audio/steps/step_leaves_5.mp3',
+      'assets/audio/steps/step_leaves_6.mp3',
+      'assets/audio/steps/step_leaves_7.mp3',
+      'assets/audio/steps/step_leaves_8.mp3'
+    ]
+  },
+  floorTypes: {
+    0: 'wood',
+    1: 'forest'
   },
 };
 
@@ -101,7 +130,9 @@ const collisionHelpers = [];
 
 const audioSystem = {
   sound: new THREE.Audio(audioListener),
-  stepSounds: [],
+  stepSounds: {},
+  currentSurfaceType: 'wood',
+  currentFloorId: 0,
   doorSounds: {
     open: null,
     close: null
@@ -123,30 +154,21 @@ const audioSystem = {
   currentSoundVolume: 0,
 
   init: function () {
-    this.loadStepSounds();
+    for (const surfaceType in SETTINGS.stepSoundPaths) {
+      this.stepSounds[surfaceType] = [];
+      this.loadStepSounds(surfaceType);
+    }
     this.loadDoorSounds();
-
     this.sound.setVolume(0);
   },
 
-  loadStepSounds: function () {
-    const stepSoundPaths = [
-      'assets/audio/steps/step_wood_1.mp3',
-      'assets/audio/steps/step_wood_2.mp3',
-      'assets/audio/steps/step_wood_3.mp3',
-      'assets/audio/steps/step_wood_4.mp3',
-      'assets/audio/steps/step_wood_5.mp3',
-      'assets/audio/steps/step_wood_6.mp3',
-      'assets/audio/steps/step_wood_7.mp3',
-      'assets/audio/steps/step_wood_8.mp3'
-    ];
-
-    stepSoundPaths.forEach((path, index) => {
+  loadStepSounds: function (surfaceType) {
+    SETTINGS.stepSoundPaths[surfaceType].forEach((path, index) => {
       const stepSound = new THREE.Audio(audioListener);
       audioLoader.load(path, (buffer) => {
         stepSound.setBuffer(buffer);
-        stepSound.setVolume(SETTINGS.stepSoundVolume);
-        this.stepSounds[index] = stepSound;
+        stepSound.setVolume(SETTINGS.stepSoundVolumes[surfaceType]);
+        this.stepSounds[surfaceType][index] = stepSound;
       });
     });
   },
@@ -168,10 +190,11 @@ const audioSystem = {
   },
 
   playRandomStepSound: function () {
-    if (this.stepSounds.length === 0) return;
+    const sounds = this.stepSounds[this.currentSurfaceType];
+    if (!sounds || sounds.length === 0) return;
 
-    const randomIndex = Math.floor(Math.random() * this.stepSounds.length);
-    const stepSound = this.stepSounds[randomIndex];
+    const randomIndex = Math.floor(Math.random() * sounds.length);
+    const stepSound = sounds[randomIndex];
 
     if (stepSound && stepSound.isPlaying) {
       stepSound.stop();
@@ -585,6 +608,8 @@ const playerSystem = {
   handleMovement: function () {
     if (!gameState.playerReady || !gameState.gameStarted) return;
 
+    this.detectSurfaceType();
+
     const cameraDirection = new THREE.Vector3();
     camera.getWorldDirection(cameraDirection);
     cameraDirection.y = 0;
@@ -784,7 +809,39 @@ const playerSystem = {
 
   easeOutQuad: function (t) {
     return t * (2 - t);
-  }
+  },
+
+  detectSurfaceType: function () {
+    const raycaster = new THREE.Raycaster();
+    raycaster.set(this.player.position, new THREE.Vector3(0, -1, 0));
+
+    const intersects = raycaster.intersectObjects(scene.children, true);
+
+    if (intersects.length > 0) {
+      const intersectedObject = intersects[0].object;
+      let floorInfo = this.getFloorInfo(intersectedObject);
+
+      if (floorInfo) {
+        audioSystem.currentSurfaceType = SETTINGS.floorTypes[floorInfo.floorId];
+      } else {
+        audioSystem.currentSurfaceType = 'wood';
+      }
+    }
+  },
+
+  getFloorInfo: function (object) {
+    let current = object;
+    while (current) {
+      if (current.userData?.isFloor && current.userData.floorId !== undefined) {
+        return {
+          isFloor: true,
+          floorId: current.userData.floorId
+        };
+      }
+      current = current.parent;
+    }
+    return null;
+  },
 };
 
 const joystickSystem = {
@@ -1036,15 +1093,22 @@ const levelSystem = {
   load: function () {
     if (gameState.levelLoaded) return;
 
-    const woodTexture = textureLoader.load('assets/textures/wood_floor.jpg');
-    woodTexture.wrapS = THREE.RepeatWrapping;
-    woodTexture.wrapT = THREE.RepeatWrapping;
+    const textures = [
+      textureLoader.load('assets/textures/wood_floor.jpg'), // floorId = 0
+      textureLoader.load('assets/textures/wood_floor.jpg') // floorId = 1
+    ];
+    textures.forEach(t => {
+      t.wrapS = THREE.RepeatWrapping;
+      t.wrapT = THREE.RepeatWrapping;
+    });
 
     gltfLoader.load('assets/levels/level_1.glb', (gltf) => {
       scene.add(gltf.scene);
 
       gltf.scene.traverse(child => {
-        if (child.userData?.isWoodFloor && child.isMesh) {
+        if (child.isMesh && child.userData?.isFloor && child.userData.floorId !== undefined) {
+          const floorId = child.userData.floorId;
+
           if (child.geometry.attributes.uv) {
             const uvArray = child.geometry.attributes.uv.array;
             const bbox = new THREE.Box3().setFromObject(child);
@@ -1063,9 +1127,9 @@ const levelSystem = {
           }
 
           child.material = new THREE.MeshStandardMaterial({
-            map: woodTexture,
-            roughness: 0.8,
-            metalness: 0.2
+            map: textures[floorId],
+            roughness: floorId === 0 ? 0.8 : 0.9,
+            metalness: floorId === 0 ? 0.2 : 0.1
           });
         }
 
