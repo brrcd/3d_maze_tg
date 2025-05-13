@@ -1222,6 +1222,88 @@ const zoneSystem = {
   }
 };
 
+const consoleLogger = {
+  logs: [],
+  maxLogs: 20, // Максимальное количество хранимых логов
+  isVisible: false,
+
+  init: function() {
+    // Сохраняем оригинальные методы консоли
+    const originalConsole = {
+      log: console.log,
+      warn: console.warn,
+      error: console.error
+    };
+
+    // Переопределяем методы консоли
+    console.log = (...args) => {
+      this.addLog('log', ...args);
+      originalConsole.log(...args);
+    };
+
+    console.warn = (...args) => {
+      this.addLog('warn', ...args);
+      originalConsole.warn(...args);
+    };
+
+    console.error = (...args) => {
+      this.addLog('error', ...args);
+      originalConsole.error(...args);
+    };
+
+    // Настройка кнопки и отображения логов
+    const logsButton = document.getElementById('logs-button');
+    const logsDisplay = document.getElementById('logs-display');
+
+    logsButton.addEventListener('click', () => {
+      this.isVisible = !this.isVisible;
+      logsDisplay.style.display = this.isVisible ? 'block' : 'none';
+      if (this.isVisible) this.updateDisplay();
+    });
+  },
+
+  addLog: function(type, ...args) {
+    // Преобразуем аргументы в строку
+    const message = args.map(arg => {
+      if (typeof arg === 'object') {
+        try {
+          return JSON.stringify(arg);
+        } catch (e) {
+          return arg.toString();
+        }
+      }
+      return arg;
+    }).join(' ');
+
+    // Добавляем временную метку
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = `[${timestamp}] ${message}`;
+
+    // Добавляем в массив логов
+    this.logs.push(logEntry);
+    if (this.logs.length > this.maxLogs) {
+      this.logs.shift();
+    }
+
+    // Обновляем отображение, если панель видима
+    if (this.isVisible) {
+      this.updateDisplay();
+    }
+  },
+
+  updateDisplay: function() {
+    const logsDisplay = document.getElementById('logs-display');
+    if (!logsDisplay) return;
+
+    logsDisplay.innerHTML = this.logs
+      .map(log => `<div class="log-entry">${log}</div>`)
+      .join('');
+
+    // Автопрокрутка вниз
+    logsDisplay.scrollTop = logsDisplay.scrollHeight;
+  }
+};
+
 function initGame() {
   postProcessingSystem.init();
   playerSystem.loadPlayerModel();
@@ -1460,3 +1542,15 @@ function resumeAudioContext() {
     ctx.resume();
   }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Проверяем, существуют ли элементы перед добавлением обработчиков
+    const logsButton = document.getElementById('logs-button');
+    const logsDisplay = document.getElementById('logs-display');
+    
+    if (logsButton && logsDisplay) {
+        consoleLogger.init();
+    } else {
+        console.error('Не удалось найти элементы для логгера');
+    }
+});
