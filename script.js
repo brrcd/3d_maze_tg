@@ -1224,52 +1224,61 @@ const zoneSystem = {
 
 const consoleLogger = {
   logs: [],
-  maxLogs: 20, // Максимальное количество хранимых логов
+  maxLogs: 20,
   isVisible: false,
 
-  init: function () {
-    // Сохраняем оригинальные методы консоли
-    const originalConsole = {
+  init: function() {
+    // Сохраняем оригинальные методы
+    const original = {
       log: console.log,
       warn: console.warn,
       error: console.error
     };
 
-    // Переопределяем методы консоли
+    // Перехватываем console.log/warn/error
     console.log = (...args) => {
       this.addLog('log', ...args);
-      originalConsole.log(...args);
+      original.log(...args);
     };
-
     console.warn = (...args) => {
       this.addLog('warn', ...args);
-      originalConsole.warn(...args);
+      original.warn(...args);
     };
-
     console.error = (...args) => {
       this.addLog('error', ...args);
-      originalConsole.error(...args);
+      original.error(...args);
     };
 
-    // Настройка кнопки и отображения логов
+    // Настройка UI
     const logsButton = document.getElementById('logs-button');
     const logsDisplay = document.getElementById('logs-display');
 
-    logsButton.addEventListener('click', () => {
-      this.isVisible = !this.isVisible;
-      logsDisplay.style.display = this.isVisible ? 'block' : 'none';
-      if (this.isVisible) this.updateDisplay();
-    });
-    logsButton.addEventListener('touchstart', (e) => {
+    // Обработчик для кликов (ПК)
+    logsButton.addEventListener('click', (e) => {
+      this.toggleLogsDisplay();
       e.preventDefault();
-      this.isVisible = !this.isVisible;
-      logsDisplay.style.display = this.isVisible ? 'block' : 'none';
-      if (this.isVisible) this.updateDisplay();
+    });
+
+    // Обработчик для тапов (мобильные)
+    logsButton.addEventListener('touchstart', (e) => {
+      this.toggleLogsDisplay();
+      e.preventDefault();
+    });
+
+    // Предотвращаем всплытие событий
+    logsDisplay.addEventListener('touchstart', (e) => {
+      e.stopPropagation();
     });
   },
 
-  addLog: function (type, ...args) {
-    // Преобразуем аргументы в строку
+  toggleLogsDisplay: function() {
+    const logsDisplay = document.getElementById('logs-display');
+    this.isVisible = !this.isVisible;
+    logsDisplay.style.display = this.isVisible ? 'block' : 'none';
+    if (this.isVisible) this.updateDisplay();
+  },
+
+  addLog: function(type, ...args) {
     const message = args.map(arg => {
       if (typeof arg === 'object') {
         try {
@@ -1281,23 +1290,20 @@ const consoleLogger = {
       return arg;
     }).join(' ');
 
-    // Добавляем временную метку
     const timestamp = new Date().toLocaleTimeString();
     const logEntry = `[${timestamp}] ${message}`;
 
-    // Добавляем в массив логов
     this.logs.push(logEntry);
     if (this.logs.length > this.maxLogs) {
       this.logs.shift();
     }
 
-    // Обновляем отображение, если панель видима
     if (this.isVisible) {
       this.updateDisplay();
     }
   },
 
-  updateDisplay: function () {
+  updateDisplay: function() {
     const logsDisplay = document.getElementById('logs-display');
     if (!logsDisplay) return;
 
@@ -1305,7 +1311,6 @@ const consoleLogger = {
       .map(log => `<div class="log-entry">${log}</div>`)
       .join('');
 
-    // Автопрокрутка вниз
     logsDisplay.scrollTop = logsDisplay.scrollHeight;
   }
 };
