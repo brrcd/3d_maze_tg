@@ -1227,7 +1227,7 @@ const consoleLogger = {
   maxLogs: 20, // Максимальное количество хранимых логов
   isVisible: false,
 
-  init: function() {
+  init: function () {
     // Сохраняем оригинальные методы консоли
     const originalConsole = {
       log: console.log,
@@ -1260,9 +1260,15 @@ const consoleLogger = {
       logsDisplay.style.display = this.isVisible ? 'block' : 'none';
       if (this.isVisible) this.updateDisplay();
     });
+    logsButton.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.isVisible = !this.isVisible;
+      logsDisplay.style.display = this.isVisible ? 'block' : 'none';
+      if (this.isVisible) this.updateDisplay();
+    });
   },
 
-  addLog: function(type, ...args) {
+  addLog: function (type, ...args) {
     // Преобразуем аргументы в строку
     const message = args.map(arg => {
       if (typeof arg === 'object') {
@@ -1291,7 +1297,7 @@ const consoleLogger = {
     }
   },
 
-  updateDisplay: function() {
+  updateDisplay: function () {
     const logsDisplay = document.getElementById('logs-display');
     if (!logsDisplay) return;
 
@@ -1543,14 +1549,14 @@ function resumeAudioContext() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Проверяем, существуют ли элементы перед добавлением обработчиков
-    const logsButton = document.getElementById('logs-button');
-    const logsDisplay = document.getElementById('logs-display');
-    
-    if (logsButton && logsDisplay) {
-        consoleLogger.init();
-    } else {
-        console.error('Не удалось найти элементы для логгера');
-    }
+document.addEventListener('DOMContentLoaded', function () {
+  // Проверяем, существуют ли элементы перед добавлением обработчиков
+  const logsButton = document.getElementById('logs-button');
+  const logsDisplay = document.getElementById('logs-display');
+
+  if (logsButton && logsDisplay) {
+    consoleLogger.init();
+  } else {
+    console.error('Не удалось найти элементы для логгера');
+  }
 });
