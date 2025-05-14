@@ -261,11 +261,29 @@ const audioSystem = {
   addSoundObject: function (object, id) {
     let soundPath;
     switch (id) {
-      case 0: soundPath = "assets/audio/music/test_song_1.wav";
-      case 1: soundPath = "assets/audio/music/test_song_1.wav";
-      case 2: soundPath = "assets/audio/music/test_song_1.wav";
-      default: soundPath = "assets/audio/music/test_song_1.wav";
+      case 0: soundPath = "assets/audio/music/picture_1.mp3";
+        break;
+      case 1: soundPath = "assets/audio/music/picture_2.mp3";
+        break;
+      case 2: soundPath = "assets/audio/music/picture_3.mp3";
+        break;
+      case 3: soundPath = "assets/audio/music/picture_4.mp3";
+        break;
+      case 4: soundPath = "assets/audio/music/picture_5.mp3";
+        break;
+      case 5: soundPath = "assets/audio/music/picture_6.mp3";
+        break;
+      case 6: soundPath = "assets/audio/music/picture_7.mp3";
+        break;
+      case 7: soundPath = "assets/audio/music/picture_8.mp3";
+        break;
+      case 8: soundPath = "assets/audio/music/picture_9.mp3";
+        break;
+      default: soundPath = "assets/audio/music/picture_1.mp3";
     }
+
+
+    console.log(`id - ${id} soundPath - ${soundPath}`)
 
     return new Promise((resolve, reject) => {
       audioLoader.load(soundPath,
@@ -1227,7 +1245,7 @@ const consoleLogger = {
   maxLogs: 20,
   isVisible: false,
 
-  init: function() {
+  init: function () {
     // Сохраняем оригинальные методы
     const original = {
       log: console.log,
@@ -1271,14 +1289,14 @@ const consoleLogger = {
     });
   },
 
-  toggleLogsDisplay: function() {
+  toggleLogsDisplay: function () {
     const logsDisplay = document.getElementById('logs-display');
     this.isVisible = !this.isVisible;
     logsDisplay.style.display = this.isVisible ? 'block' : 'none';
     if (this.isVisible) this.updateDisplay();
   },
 
-  addLog: function(type, ...args) {
+  addLog: function (type, ...args) {
     const message = args.map(arg => {
       if (typeof arg === 'object') {
         try {
@@ -1303,7 +1321,7 @@ const consoleLogger = {
     }
   },
 
-  updateDisplay: function() {
+  updateDisplay: function () {
     const logsDisplay = document.getElementById('logs-display');
     if (!logsDisplay) return;
 
