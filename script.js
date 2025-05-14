@@ -1231,10 +1231,10 @@ const zoneSystem = {
     const fromZone = audioSystem.ambientMusic.currentZone;
     let toZone;
 
-    if (fromZone === trigger.userData.zoneB) {
-      toZone = trigger.userData.zoneA;
-    } else {
+    if (fromZone === trigger.userData.zoneA) {
       return;
+    } else {
+      toZone = trigger.userData.zoneA;
     }
     audioSystem.switchToZone(toZone);
   }
