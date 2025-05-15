@@ -1113,7 +1113,7 @@ const levelSystem = {
 
     const textures = [
       textureLoader.load('assets/textures/wood_floor.jpg'), // floorId = 0
-      textureLoader.load('assets/textures/wood_floor.jpg') // floorId = 1
+      textureLoader.load('assets/textures/grass_floor.png') // floorId = 1
     ];
     textures.forEach(t => {
       t.wrapS = THREE.RepeatWrapping;
