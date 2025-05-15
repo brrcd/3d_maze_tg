@@ -1120,7 +1120,7 @@ const levelSystem = {
       t.wrapT = THREE.RepeatWrapping;
     });
 
-    gltfLoader.load('assets/levels/level_1.glb', (gltf) => {
+    gltfLoader.load('assets/levels/level_2.glb', (gltf) => {
       scene.add(gltf.scene);
 
       gltf.scene.traverse(child => {
