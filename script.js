@@ -280,10 +280,8 @@ const audioSystem = {
       case 8: soundPath = "assets/audio/music/picture_9.mp3";
         break;
       default: soundPath = "assets/audio/music/picture_1.mp3";
+        break;
     }
-
-
-    console.log(`id - ${id} soundPath - ${soundPath}`)
 
     return new Promise((resolve, reject) => {
       audioLoader.load(soundPath,
@@ -1182,6 +1180,7 @@ const levelSystem = {
       }
 
       gameState.levelLoaded = true;
+      scene.fog = new THREE.Fog(0x87CEEB, 5, 15);
     });
   }
 };
