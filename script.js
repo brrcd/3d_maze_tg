@@ -73,9 +73,9 @@ const SETTINGS = {
     1: 'forest'
   },
   fogSettings: {
-    room: { near: 100, far: 100, color: 0x87CEEB },
-    corridor: { near: 100, far: 100, color: 0x87CEEB },
-    forest: { near: 5, far: 10, color: 0x87CEEB } 
+    room: { near: 100, far: 100, color: 0x9abfbf },
+    corridor: { near: 100, far: 100, color: 0x9abfbf },
+    forest: { near: 1, far: 18, color: 0x9abfbf } 
   }
 };
 
@@ -1185,7 +1185,7 @@ const levelSystem = {
       }
 
       gameState.levelLoaded = true;
-      scene.fog = new THREE.Fog(0x87CEEB, 100, 150);
+      scene.fog = new THREE.Fog(0x9abfbf, 100, 100);
     });
   }
 };
@@ -1249,7 +1249,7 @@ const zoneSystem = {
     const fogSettings = SETTINGS.fogSettings[zone];
     if (!fogSettings || !scene.fog) return;
 
-    const duration = 2500;
+    const duration = 1500;
     const startTime = Date.now();
     const startNear = scene.fog.near;
     const startFar = scene.fog.far;
