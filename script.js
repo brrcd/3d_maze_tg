@@ -75,7 +75,7 @@ const SETTINGS = {
   fogSettings: {
     room: { near: 100, far: 100, color: 0x9abfbf },
     corridor: { near: 100, far: 100, color: 0x9abfbf },
-    forest: { near: 1, far: 18, color: 0x9abfbf } 
+    forest: { near: 1, far: 18, color: 0x9abfbf }
   }
 };
 
@@ -102,7 +102,7 @@ const audioListener = new THREE.AudioListener();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.add(audioListener);
 
-scene.add(new THREE.AmbientLight(0xFFFFFF));
+// scene.add(new THREE.AmbientLight(0xFFFFFF));
 const debugSphere = new THREE.Mesh(
   new THREE.SphereGeometry(0.5),
   new THREE.MeshBasicMaterial({ color: 0xff0000 })
@@ -1180,6 +1180,37 @@ const levelSystem = {
           ).catch(e => {
             console.error("Ошибка создания звукового объекта:", e);
           });
+        }
+
+        if (child.userData?.isLightSource) {
+          const light = new THREE.PointLight(
+            0xffdd99, // теплый желтоватый свет
+            10,        // интенсивность
+            15,        // расстояние
+            5         // затухание
+          );
+
+          // Позиционируем свет в том же месте, где объект
+          light.position.copy(child.position);
+          scene.add(light);
+
+          // Создаем цель для ориентации (на 6 единиц ниже)
+          const target = new THREE.Object3D();
+          target.position.set(
+            child.position.x,
+            child.position.y - 6,
+            child.position.z
+          );
+          scene.add(target);
+
+          // Если нужно, чтобы свет был дочерним объектом
+          // child.add(light);
+
+          // Для отладки можно добавить помощник
+          if (gameState.showCollisionDebug) {
+            const helper = new THREE.PointLightHelper(light, 0.5);
+            scene.add(helper);
+          }
         }
       });
 
