@@ -72,6 +72,11 @@ const SETTINGS = {
     0: 'wood',
     1: 'forest'
   },
+  fogSettings: {
+    room: { near: 100, far: 100, color: 0x87CEEB },
+    corridor: { near: 100, far: 100, color: 0x87CEEB },
+    forest: { near: 5, far: 10, color: 0x87CEEB } 
+  }
 };
 
 const scene = new THREE.Scene();
@@ -1180,7 +1185,7 @@ const levelSystem = {
       }
 
       gameState.levelLoaded = true;
-      scene.fog = new THREE.Fog(0x87CEEB, 5, 15);
+      scene.fog = new THREE.Fog(0x87CEEB, 100, 150);
     });
   }
 };
@@ -1236,6 +1241,34 @@ const zoneSystem = {
       toZone = trigger.userData.zoneA;
     }
     audioSystem.switchToZone(toZone);
+
+    this.updateFog(toZone);
+  },
+
+  updateFog: function (zone) {
+    const fogSettings = SETTINGS.fogSettings[zone];
+    if (!fogSettings || !scene.fog) return;
+
+    const duration = 2500;
+    const startTime = Date.now();
+    const startNear = scene.fog.near;
+    const startFar = scene.fog.far;
+    const startColor = scene.fog.color.clone();
+
+    const animateFog = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      scene.fog.near = THREE.MathUtils.lerp(startNear, fogSettings.near, progress);
+      scene.fog.far = THREE.MathUtils.lerp(startFar, fogSettings.far, progress);
+      scene.fog.color.lerpColors(startColor, new THREE.Color(fogSettings.color), progress);
+
+      if (progress < 1) {
+        requestAnimationFrame(animateFog);
+      }
+    };
+
+    animateFog();
   }
 };
 
