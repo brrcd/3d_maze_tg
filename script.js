@@ -80,7 +80,7 @@ const SETTINGS = {
 };
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB);
+scene.background = new THREE.Color(0x9abfbf);
 
 const renderer = new THREE.WebGLRenderer({
   antialias: false,
@@ -563,7 +563,6 @@ const playerSystem = {
         animationSystem.mixer = new THREE.AnimationMixer(this.player);
 
         animationSystem.loadAnimation('Running', 'assets/models/animations/Hazmat_Character_Running.fbx');
-        animationSystem.loadAnimation('Running1', 'assets/models/animations/Hazmat_Character_Running1.fbx');
         animationSystem.loadAnimation('Walking', 'assets/models/animations/Hazmat_Character_Walking.fbx');
         animationSystem.loadAnimation('Idle', 'assets/models/animations/Hazmat_Character_Idle.fbx');
 
@@ -692,7 +691,7 @@ const playerSystem = {
         this.player.rotation.y = Math.atan2(moveVector.x, moveVector.z);
       }
 
-      animationSystem.playAnimation('Running1');
+      animationSystem.playAnimation('Running');
       if (Date.now() - audioSystem.lastStepTime > 330) {
         audioSystem.lastStepTime = Date.now();
         audioSystem.playRandomStepSound();
@@ -1168,6 +1167,10 @@ const levelSystem = {
           child.userData.isInteractable = true;
           child.userData.isClosed = true;
           collidableObjects.push(child);
+        }
+
+        if (child.userData?.isInvisibleWall) {
+          child.visible = false;
         }
 
         if (child.userData?.isSoundObject) {
