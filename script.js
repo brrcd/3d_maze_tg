@@ -76,7 +76,13 @@ const SETTINGS = {
     room: { near: 100, far: 100, color: 0x9abfbf },
     corridor: { near: 100, far: 100, color: 0x9abfbf },
     forest: { near: 1, far: 18, color: 0x9abfbf }
-  }
+  },
+  lightSettigs: {
+    lightSourceTypes: {
+      0: 'point',
+      1: 'ambient'
+    }
+  },
 };
 
 const scene = new THREE.Scene();
@@ -1183,34 +1189,50 @@ const levelSystem = {
         }
 
         if (child.userData?.isLightSource) {
-          const light = new THREE.PointLight(
-            0xffdd99, // теплый желтоватый свет
-            10,        // интенсивность
-            15,        // расстояние
-            5         // затухание
-          );
+          console.log(`light source type - ${child.userData?.lightSourceType} id - ${child.userData?.lightSourceId}`)
+          console.log(`${child.position.x} ${child.position.y} ${child.position.z}`);
+          if (child.userData?.lightSourceType == SETTINGS.lightSettigs.lightSourceTypes[0]) {
+            const light = new THREE.PointLight(
+              0xffdd99, // теплый желтоватый свет
+              10,        // интенсивность
+              15,        // расстояние
+              5         // затухание
+            );
 
-          // Позиционируем свет в том же месте, где объект
-          light.position.copy(child.position);
-          scene.add(light);
+            light.position.copy(child.position);
+            scene.add(light);
 
-          // Создаем цель для ориентации (на 6 единиц ниже)
-          const target = new THREE.Object3D();
-          target.position.set(
-            child.position.x,
-            child.position.y - 6,
-            child.position.z
-          );
-          scene.add(target);
+            const target = new THREE.Object3D();
+            target.position.set(
+              child.position.x,
+              child.position.y - 6,
+              child.position.z
+            );
+            scene.add(target);
+          }
+
+          if (child.userData?.lightSourceType == SETTINGS.lightSettigs.lightSourceTypes[1]) {
+            const light = new THREE.PointLight(
+              0xc43535, // теплый желтоватый свет
+              10,        // интенсивность
+              15,        // расстояние
+              5         // затухание
+            );
+
+            light.position.copy(child.position);
+            scene.add(light);
+
+            const target = new THREE.Object3D();
+            target.position.set(
+              child.position.x,
+              child.position.y - 6,
+              child.position.z
+            );
+            scene.add(target);
+          }
 
           // Если нужно, чтобы свет был дочерним объектом
           // child.add(light);
-
-          // Для отладки можно добавить помощник
-          if (gameState.showCollisionDebug) {
-            const helper = new THREE.PointLightHelper(light, 0.5);
-            scene.add(helper);
-          }
         }
       });
 
