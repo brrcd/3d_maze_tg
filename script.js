@@ -80,7 +80,8 @@ const SETTINGS = {
   lightSettigs: {
     lightSourceTypes: {
       0: 'point',
-      1: 'ambient'
+      1: 'ambient',
+      2: 'square'
     }
   },
 };
@@ -1193,30 +1194,42 @@ const levelSystem = {
           console.log(`${child.position.x} ${child.position.y} ${child.position.z}`);
           if (child.userData?.lightSourceType == SETTINGS.lightSettigs.lightSourceTypes[0]) {
             const light = new THREE.PointLight(
-              0xffdd99, // теплый желтоватый свет
-              10,        // интенсивность
-              15,        // расстояние
-              5         // затухание
+              0xffdd99,
+              10,
+              15,
+              3
             );
 
-            light.position.copy(child.position);
-            scene.add(light);
-
-            const target = new THREE.Object3D();
-            target.position.set(
+            light.position.set(
               child.position.x,
-              child.position.y - 6,
+              child.position.y - 0.6,
               child.position.z
             );
-            scene.add(target);
-          }
-
-          if (child.userData?.lightSourceType == SETTINGS.lightSettigs.lightSourceTypes[1]) {
+            scene.add(light);
+          } else if (child.userData?.lightSourceType == SETTINGS.lightSettigs.lightSourceTypes[1]) {
             const light = new THREE.PointLight(
-              0xc43535, // теплый желтоватый свет
-              10,        // интенсивность
-              15,        // расстояние
-              5         // затухание
+              0xc43535,
+              10,
+              15,
+              3
+            );
+
+            light.position.copy(child.position);
+            scene.add(light);
+
+            const target = new THREE.Object3D();
+            target.position.set(
+              child.position.x,
+              child.position.y - 6,
+              child.position.z
+            );
+            scene.add(target);
+          } else {
+                        const light = new THREE.PointLight(
+              0xc43535,
+              10,
+              15,
+              3
             );
 
             light.position.copy(child.position);
@@ -1230,9 +1243,6 @@ const levelSystem = {
             );
             scene.add(target);
           }
-
-          // Если нужно, чтобы свет был дочерним объектом
-          // child.add(light);
         }
       });
 
