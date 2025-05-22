@@ -109,7 +109,7 @@ const audioListener = new THREE.AudioListener();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.add(audioListener);
 
-// scene.add(new THREE.AmbientLight(0xFFFFFF));
+scene.add(new THREE.AmbientLight(0xFFFFFF, 0.5));
 const debugSphere = new THREE.Mesh(
   new THREE.SphereGeometry(0.5),
   new THREE.MeshBasicMaterial({ color: 0xff0000 })
@@ -1189,61 +1189,53 @@ const levelSystem = {
           });
         }
 
-        if (child.userData?.isLightSource) {
-          console.log(`light source type - ${child.userData?.lightSourceType} id - ${child.userData?.lightSourceId}`)
-          console.log(`${child.position.x} ${child.position.y} ${child.position.z}`);
-          if (child.userData?.lightSourceType == SETTINGS.lightSettigs.lightSourceTypes[0]) {
-            const light = new THREE.PointLight(
-              0xffdd99,
-              10,
-              15,
-              3
-            );
+      //   if (child.userData?.isLightSource) {
+      //     if (child.userData?.lightSourceType == SETTINGS.lightSettigs.lightSourceTypes[0]) {
+      //       const light = new THREE.PointLight(
+      //         0xffdd99,
+      //         1,
+      //         15,
+      //         3
+      //       );
 
-            light.position.set(
-              child.position.x,
-              child.position.y - 0.6,
-              child.position.z
-            );
-            scene.add(light);
-          } else if (child.userData?.lightSourceType == SETTINGS.lightSettigs.lightSourceTypes[1]) {
-            const light = new THREE.PointLight(
-              0xc43535,
-              10,
-              15,
-              3
-            );
+      //       light.position.set(
+      //         child.position.x,
+      //         child.position.y - 0.6,
+      //         child.position.z
+      //       );
+      //       scene.add(light);
+      //     } else if (child.userData?.lightSourceType == SETTINGS.lightSettigs.lightSourceTypes[1]) {
+      //       const light = new THREE.PointLight(
+      //         0xc43535,
+      //         1,
+      //         15,
+      //         3
+      //       );
 
-            light.position.copy(child.position);
-            scene.add(light);
+      //       light.position.copy(child.position);
+      //       scene.add(light);
 
-            const target = new THREE.Object3D();
-            target.position.set(
-              child.position.x,
-              child.position.y - 6,
-              child.position.z
-            );
-            scene.add(target);
-          } else {
-                        const light = new THREE.PointLight(
-              0xc43535,
-              10,
-              15,
-              3
-            );
-
-            light.position.copy(child.position);
-            scene.add(light);
-
-            const target = new THREE.Object3D();
-            target.position.set(
-              child.position.x,
-              child.position.y - 6,
-              child.position.z
-            );
-            scene.add(target);
-          }
-        }
+      //       const target = new THREE.Object3D();
+      //       target.position.set(
+      //         child.position.x,
+      //         child.position.y - 6,
+      //         child.position.z
+      //       );
+      //       scene.add(target);
+      //     } else if (child.userData?.lightSourceType == SETTINGS.lightSettigs.lightSourceTypes[2]) {
+      //       const length = child.geometry.boundingBox.max.x - child.geometry.boundingBox.min.x;
+      //       const width = child.geometry.boundingBox.max.z - child.geometry.boundingBox.min.z;
+      //       const intensity = 2;
+      //       const rectLight = new THREE.RectAreaLight(0xffdd99, intensity, length, width);
+      //       rectLight.rotation.x = THREE.MathUtils.degToRad(-90);
+      //       rectLight.position.set(
+      //         child.position.x,
+      //         child.position.y-0.1,
+      //         child.position.z
+      //       );
+      //       scene.add(rectLight)
+      //     }
+      //   }
       });
 
       if (gameState.showCollisionDebug) {
@@ -1437,6 +1429,7 @@ function initGame() {
   controlSystem.init();
   introSystem.init();
   levelSystem.load();
+  THREE.RectAreaLightUniformsLib.init();
 
   const startScreen = document.getElementById('start-screen');
   const startButton = document.getElementById('start-button');
