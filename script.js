@@ -1200,34 +1200,67 @@ const levelSystem = {
           });
         }
 
-        if (child.userData?.isLightSource && child.userData?.isRoomLamp) {
-          const lampLight = new THREE.SpotLight(
-            SETTINGS.lightSettings.roomLamp.color,
-            SETTINGS.lightSettings.roomLamp.intensity,
-            SETTINGS.lightSettings.roomLamp.distance,
-            SETTINGS.lightSettings.roomLamp.angle,
-            SETTINGS.lightSettings.roomLamp.penumbra,
-            SETTINGS.lightSettings.roomLamp.decay
-          );
+        if (child.userData?.isLightSource) {
+          if (child.userData?.isRoomLamp) {
+            const lampLight = new THREE.SpotLight(
+              SETTINGS.lightSettings.roomLamp.color,
+              SETTINGS.lightSettings.roomLamp.intensity,
+              SETTINGS.lightSettings.roomLamp.distance,
+              SETTINGS.lightSettings.roomLamp.angle,
+              SETTINGS.lightSettings.roomLamp.penumbra,
+              SETTINGS.lightSettings.roomLamp.decay
+            );
 
-          lampLight.position.set(
-            child.position.x,
-            child.position.y - 0.5,
-            child.position.z
-          );
-          lampLight.target.position.set(
-            child.position.x,
-            child.position.y - 5,
-            child.position.z
-          );
+            lampLight.position.set(child.position.x, child.position.y - 0.5, child.position.z);
+            lampLight.target.position.set(child.position.x, child.position.y - 5, child.position.z);
+            lampLight.castShadow = false;
+            lampLight.visible = false;
 
-          lampLight.castShadow = false;
-          lampLight.visible = false;
+            child.userData.lampLight = lampLight;
+            scene.add(lampLight);
+            scene.add(lampLight.target);
+          }
 
-          child.userData.lampLight = lampLight;
+          if (child.userData?.isForestLamp) {
+            child.traverse(lightBulb => {
+              if (lightBulb.userData?.isLightBulb) {
+                const forestLight = new THREE.SpotLight(
+                  SETTINGS.lightSettings.forestLamp.color,
+                  SETTINGS.lightSettings.forestLamp.intensity,
+                  SETTINGS.lightSettings.forestLamp.distance,
+                  SETTINGS.lightSettings.forestLamp.angle,
+                  SETTINGS.lightSettings.forestLamp.penumbra,
+                  SETTINGS.lightSettings.forestLamp.decay
+                );
 
-          scene.add(lampLight);
-          scene.add(lampLight.target);
+                const worldPosition = new THREE.Vector3();
+                lightBulb.getWorldPosition(worldPosition);
+                forestLight.position.copy(worldPosition);
+
+                const targetPosition = new THREE.Vector3(
+                  worldPosition.x,
+                  worldPosition.y - 3,
+                  worldPosition.z
+                );
+
+                const targetObject = new THREE.Object3D();
+                targetObject.position.copy(targetPosition);
+                scene.add(targetObject);
+                forestLight.target = targetObject;
+
+                forestLight.visible = false;
+
+                forestLight.updateMatrixWorld();
+                targetObject.updateMatrixWorld();
+
+                lightBulb.userData.forestLight = forestLight;
+                child.userData.forestLight = forestLight;
+                child.userData.lightTarget = targetObject;
+
+                scene.add(forestLight);
+              }
+            });
+          }
         }
       });
 
@@ -1302,6 +1335,11 @@ const zoneSystem = {
       if (child.userData?.isLightSource && child.userData?.isRoomLamp) {
         if (child.userData.lampLight) {
           child.userData.lampLight.visible = (zone === 'room');
+        }
+      }
+      if (child.userData?.isLightSource && child.userData?.isForestLamp) {
+        if (child.userData.forestLight) {
+          child.userData.forestLight.visible = (zone === 'forest');
         }
       }
     });
