@@ -77,11 +77,22 @@ const SETTINGS = {
     corridor: { near: 100, far: 100, color: 0x9abfbf },
     forest: { near: 1, far: 18, color: 0x9abfbf }
   },
-  lightSettigs: {
-    lightSourceTypes: {
-      0: 'point',
-      1: 'ambient',
-      2: 'square'
+  lightSettings: {
+    roomLamp: {
+      color: 0xffdd99,
+      intensity: 3,
+      distance: 14,
+      angle: Math.PI / 2,
+      penumbra: 1.5,
+      decay: 2
+    },
+    forestLamp: {
+      color: 0x55ff55,
+      intensity: 0.8,
+      distance: 15,
+      angle: Math.PI / 3,
+      penumbra: 0.3,
+      decay: 1.5
     }
   },
 };
@@ -1189,53 +1200,35 @@ const levelSystem = {
           });
         }
 
-      //   if (child.userData?.isLightSource) {
-      //     if (child.userData?.lightSourceType == SETTINGS.lightSettigs.lightSourceTypes[0]) {
-      //       const light = new THREE.PointLight(
-      //         0xffdd99,
-      //         1,
-      //         15,
-      //         3
-      //       );
+        if (child.userData?.isLightSource && child.userData?.isRoomLamp) {
+          const lampLight = new THREE.SpotLight(
+            SETTINGS.lightSettings.roomLamp.color,
+            SETTINGS.lightSettings.roomLamp.intensity,
+            SETTINGS.lightSettings.roomLamp.distance,
+            SETTINGS.lightSettings.roomLamp.angle,
+            SETTINGS.lightSettings.roomLamp.penumbra,
+            SETTINGS.lightSettings.roomLamp.decay
+          );
 
-      //       light.position.set(
-      //         child.position.x,
-      //         child.position.y - 0.6,
-      //         child.position.z
-      //       );
-      //       scene.add(light);
-      //     } else if (child.userData?.lightSourceType == SETTINGS.lightSettigs.lightSourceTypes[1]) {
-      //       const light = new THREE.PointLight(
-      //         0xc43535,
-      //         1,
-      //         15,
-      //         3
-      //       );
+          lampLight.position.set(
+            child.position.x,
+            child.position.y - 0.5,
+            child.position.z
+          );
+          lampLight.target.position.set(
+            child.position.x,
+            child.position.y - 5,
+            child.position.z
+          );
 
-      //       light.position.copy(child.position);
-      //       scene.add(light);
+          lampLight.castShadow = false;
+          lampLight.visible = false;
 
-      //       const target = new THREE.Object3D();
-      //       target.position.set(
-      //         child.position.x,
-      //         child.position.y - 6,
-      //         child.position.z
-      //       );
-      //       scene.add(target);
-      //     } else if (child.userData?.lightSourceType == SETTINGS.lightSettigs.lightSourceTypes[2]) {
-      //       const length = child.geometry.boundingBox.max.x - child.geometry.boundingBox.min.x;
-      //       const width = child.geometry.boundingBox.max.z - child.geometry.boundingBox.min.z;
-      //       const intensity = 2;
-      //       const rectLight = new THREE.RectAreaLight(0xffdd99, intensity, length, width);
-      //       rectLight.rotation.x = THREE.MathUtils.degToRad(-90);
-      //       rectLight.position.set(
-      //         child.position.x,
-      //         child.position.y-0.1,
-      //         child.position.z
-      //       );
-      //       scene.add(rectLight)
-      //     }
-      //   }
+          child.userData.lampLight = lampLight;
+
+          scene.add(lampLight);
+          scene.add(lampLight.target);
+        }
       });
 
       if (gameState.showCollisionDebug) {
@@ -1300,7 +1293,18 @@ const zoneSystem = {
     }
     audioSystem.switchToZone(toZone);
 
+    this.updateLighting(toZone);
     this.updateFog(toZone);
+  },
+
+  updateLighting: function (zone) {
+    scene.traverse(child => {
+      if (child.userData?.isLightSource && child.userData?.isRoomLamp) {
+        if (child.userData.lampLight) {
+          child.userData.lampLight.visible = (zone === 'room');
+        }
+      }
+    });
   },
 
   updateFog: function (zone) {
@@ -1327,99 +1331,6 @@ const zoneSystem = {
     };
 
     animateFog();
-  }
-};
-
-const consoleLogger = {
-  logs: [],
-  maxLogs: 20,
-  isVisible: false,
-
-  init: function () {
-    // Сохраняем оригинальные методы
-    const original = {
-      log: console.log,
-      warn: console.warn,
-      error: console.error
-    };
-
-    // Перехватываем console.log/warn/error
-    console.log = (...args) => {
-      this.addLog('log', ...args);
-      original.log(...args);
-    };
-    console.warn = (...args) => {
-      this.addLog('warn', ...args);
-      original.warn(...args);
-    };
-    console.error = (...args) => {
-      this.addLog('error', ...args);
-      original.error(...args);
-    };
-
-    // Настройка UI
-    const logsButton = document.getElementById('logs-button');
-    const logsDisplay = document.getElementById('logs-display');
-
-    // Обработчик для кликов (ПК)
-    logsButton.addEventListener('click', (e) => {
-      this.toggleLogsDisplay();
-      e.preventDefault();
-    });
-
-    // Обработчик для тапов (мобильные)
-    logsButton.addEventListener('touchstart', (e) => {
-      this.toggleLogsDisplay();
-      e.preventDefault();
-    });
-
-    // Предотвращаем всплытие событий
-    logsDisplay.addEventListener('touchstart', (e) => {
-      e.stopPropagation();
-    });
-  },
-
-  toggleLogsDisplay: function () {
-    const logsDisplay = document.getElementById('logs-display');
-    this.isVisible = !this.isVisible;
-    logsDisplay.style.display = this.isVisible ? 'block' : 'none';
-    if (this.isVisible) this.updateDisplay();
-  },
-
-  addLog: function (type, ...args) {
-    const message = args.map(arg => {
-      if (typeof arg === 'object') {
-        try {
-          return JSON.stringify(arg);
-        } catch (e) {
-          return arg.toString();
-        }
-      }
-      return arg;
-    }).join(' ');
-
-    const timestamp = new Date().toLocaleTimeString();
-    const logEntry = `[${timestamp}] ${message}`;
-
-    this.logs.push(logEntry);
-    if (this.logs.length > this.maxLogs) {
-      this.logs.shift();
-    }
-
-    if (this.isVisible) {
-      this.updateDisplay();
-    }
-  },
-
-  updateDisplay: function () {
-    const logsDisplay = document.getElementById('logs-display');
-    if (!logsDisplay) return;
-
-    logsDisplay.innerHTML = this.logs
-      .map(log => `<div class="log-entry">${log}</div>`)
-      .join('');
-
-    logsDisplay.scrollTop = logsDisplay.scrollHeight;
   }
 };
 
@@ -1450,6 +1361,8 @@ function initGame() {
         roomMusic.play();
       }
     });
+
+    zoneSystem.updateLighting(audioSystem.ambientMusic.currentZone);
 
     setTimeout(() => {
       phoneSystem.startCall();
@@ -1662,15 +1575,3 @@ function resumeAudioContext() {
     ctx.resume();
   }
 }
-
-document.addEventListener('DOMContentLoaded', function () {
-  // Проверяем, существуют ли элементы перед добавлением обработчиков
-  const logsButton = document.getElementById('logs-button');
-  const logsDisplay = document.getElementById('logs-display');
-
-  if (logsButton && logsDisplay) {
-    consoleLogger.init();
-  } else {
-    console.error('Не удалось найти элементы для логгера');
-  }
-});
