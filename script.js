@@ -213,6 +213,7 @@ const audioSystem = {
   },
 
   playRandomStepSound: function () {
+    console.log(`currentSurfaceType - ${this.currentSurfaceType}`)
     const sounds = this.stepSounds[this.currentSurfaceType];
     if (!sounds || sounds.length === 0) return;
 
@@ -646,8 +647,6 @@ const playerSystem = {
   handleMovement: function () {
     if (!gameState.playerReady || !gameState.gameStarted) return;
 
-    this.detectSurfaceType();
-
     const cameraDirection = new THREE.Vector3();
     camera.getWorldDirection(cameraDirection);
     cameraDirection.y = 0;
@@ -847,38 +846,6 @@ const playerSystem = {
 
   easeOutQuad: function (t) {
     return t * (2 - t);
-  },
-
-  detectSurfaceType: function () {
-    const raycaster = new THREE.Raycaster();
-    raycaster.set(this.player.position, new THREE.Vector3(0, -1, 0));
-
-    const intersects = raycaster.intersectObjects(scene.children, true);
-
-    if (intersects.length > 0) {
-      const intersectedObject = intersects[0].object;
-      let floorInfo = this.getFloorInfo(intersectedObject);
-
-      if (floorInfo) {
-        audioSystem.currentSurfaceType = SETTINGS.floorTypes[floorInfo.floorId];
-      } else {
-        audioSystem.currentSurfaceType = 'wood';
-      }
-    }
-  },
-
-  getFloorInfo: function (object) {
-    let current = object;
-    while (current) {
-      if (current.userData?.isFloor && current.userData.floorId !== undefined) {
-        return {
-          isFloor: true,
-          floorId: current.userData.floorId
-        };
-      }
-      current = current.parent;
-    }
-    return null;
   },
 };
 
@@ -1325,6 +1292,13 @@ const zoneSystem = {
       toZone = trigger.userData.zoneA;
     }
     audioSystem.switchToZone(toZone);
+
+    // Update step sound based on zone
+    if (toZone === 'forest') {
+      audioSystem.currentSurfaceType = 'forest';
+    } else {
+      audioSystem.currentSurfaceType = 'wood';
+    }
 
     this.updateLighting(toZone);
     this.updateFog(toZone);
