@@ -75,7 +75,7 @@ const SETTINGS = {
   fogSettings: {
     room: { near: 100, far: 100, color: 0x9abfbf },
     corridor: { near: 100, far: 100, color: 0x9abfbf },
-    forest: { near: 1, far: 18, color: 0x9abfbf }
+    forest: { near: 3, far: 25, color: 0x9abfbf }
   },
   lightSettings: {
     roomLamp: {
