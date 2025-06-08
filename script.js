@@ -638,9 +638,14 @@ const playerSystem = {
         gameState.playerReady = true;
         animationSystem.mixer = new THREE.AnimationMixer(this.player);
 
-        animationSystem.loadAnimation('Running', 'assets/models/animations/Hazmat_Character_Running.fbx');
-        animationSystem.loadAnimation('Walking', 'assets/models/animations/Hazmat_Character_Walking.fbx');
-        animationSystem.loadAnimation('Idle', 'assets/models/animations/Hazmat_Character_Idle.fbx');
+        animationSystem.loadAnimation('Running', 'assets/models/animations/Running.fbx');
+        animationSystem.loadAnimation('Idle', 'assets/models/animations/Idle.fbx');
+
+        animationSystem.loadAnimation('Hip_Hop_Dancing', 'assets/models/animations/Hip_Hop_Dancing.fbx');
+        animationSystem.loadAnimation('Listening_To_Music', 'assets/models/animations/Listening_To_Music.fbx');
+        animationSystem.loadAnimation('Looking', 'assets/models/animations/Looking.fbx');
+        animationSystem.loadAnimation('Rapping', 'assets/models/animations/Rapping.fbx');
+        animationSystem.loadAnimation('Wave_Hip_Hop_Dancing', 'assets/models/animations/Wave_Hip_Hop_Dancing.fbx');
 
         if (fbx.animations && fbx.animations.length > 0) {
           const action = animationSystem.mixer.clipAction(fbx.animations[0]);
