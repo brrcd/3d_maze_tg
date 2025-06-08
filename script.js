@@ -95,6 +95,21 @@ const SETTINGS = {
       decay: 1.5
     }
   },
+  loadingText: {
+    style: `
+      position: absolute;
+      top: 20%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: orange;
+      font-family: 'Courier New', monospace;
+      font-size: 24px;
+      text-align: center;
+      width: 80%;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    `
+  }
 };
 
 const scene = new THREE.Scene();
@@ -177,39 +192,74 @@ const audioSystem = {
   currentSoundVolume: 0,
 
   init: function () {
+    loadingSystem.startLoading();
+    
+    // Count step sounds
+    for (const surfaceType in SETTINGS.stepSoundPaths) {
+      SETTINGS.stepSoundPaths[surfaceType].forEach(() => {
+        loadingSystem.addResource();
+      });
+    }
+    
+    // Add door sounds
+    loadingSystem.addResource(); // For door open
+    loadingSystem.addResource(); // For door close
+    
+    // Add ambient music
+    SETTINGS.zones.forEach(() => {
+      loadingSystem.addResource();
+    });
+
     for (const surfaceType in SETTINGS.stepSoundPaths) {
       this.stepSounds[surfaceType] = [];
       this.loadStepSounds(surfaceType);
     }
     this.loadDoorSounds();
-    this.sound.setVolume(0);
+    this.loadAmbientMusic().then(() => {
+      this.sound.setVolume(0);
+    });
   },
 
   loadStepSounds: function (surfaceType) {
     SETTINGS.stepSoundPaths[surfaceType].forEach((path, index) => {
       const stepSound = new THREE.Audio(audioListener);
-      audioLoader.load(path, (buffer) => {
-        stepSound.setBuffer(buffer);
-        stepSound.setVolume(SETTINGS.stepSoundVolumes[surfaceType]);
-        this.stepSounds[surfaceType][index] = stepSound;
-      });
+      audioLoader.load(path, 
+        (buffer) => {
+          stepSound.setBuffer(buffer);
+          stepSound.setVolume(SETTINGS.stepSoundVolumes[surfaceType]);
+          this.stepSounds[surfaceType][index] = stepSound;
+          loadingSystem.resourceLoaded();
+        },
+        undefined,
+        () => loadingSystem.resourceLoaded()
+      );
     });
   },
 
   loadDoorSounds: function () {
-    audioLoader.load('assets/audio/door/door_open.mp3', (buffer) => {
-      const openSound = new THREE.Audio(audioListener);
-      openSound.setBuffer(buffer);
-      openSound.setVolume(SETTINGS.doorSoundVolume);
-      this.doorSounds.open = openSound;
-    });
+    audioLoader.load('assets/audio/door/door_open.mp3', 
+      (buffer) => {
+        const openSound = new THREE.Audio(audioListener);
+        openSound.setBuffer(buffer);
+        openSound.setVolume(SETTINGS.doorSoundVolume);
+        this.doorSounds.open = openSound;
+        loadingSystem.resourceLoaded();
+      },
+      undefined,
+      () => loadingSystem.resourceLoaded()
+    );
 
-    audioLoader.load('assets/audio/door/door_close.mp3', (buffer) => {
-      const closeSound = new THREE.Audio(audioListener);
-      closeSound.setBuffer(buffer);
-      closeSound.setVolume(SETTINGS.doorSoundVolume);
-      this.doorSounds.close = closeSound;
-    });
+    audioLoader.load('assets/audio/door/door_close.mp3', 
+      (buffer) => {
+        const closeSound = new THREE.Audio(audioListener);
+        closeSound.setBuffer(buffer);
+        closeSound.setVolume(SETTINGS.doorSoundVolume);
+        this.doorSounds.close = closeSound;
+        loadingSystem.resourceLoaded();
+      },
+      undefined,
+      () => loadingSystem.resourceLoaded()
+    );
   },
 
   playRandomStepSound: function () {
@@ -230,15 +280,23 @@ const audioSystem = {
   loadAmbientMusic: function () {
     const promises = SETTINGS.zones.map(zone => {
       return new Promise((resolve) => {
-        audioLoader.load(SETTINGS.ambientMusic[zone].path, (buffer) => {
-          const sound = new THREE.Audio(audioListener);
-          sound.setBuffer(buffer);
-          sound.setLoop(true);
-          sound.setVolume(0);
-          sound.zone = zone;
-          this.ambientMusic.tracks[zone] = sound;
-          resolve();
-        });
+        audioLoader.load(SETTINGS.ambientMusic[zone].path, 
+          (buffer) => {
+            const sound = new THREE.Audio(audioListener);
+            sound.setBuffer(buffer);
+            sound.setLoop(true);
+            sound.setVolume(0);
+            sound.zone = zone;
+            this.ambientMusic.tracks[zone] = sound;
+            loadingSystem.resourceLoaded();
+            resolve();
+          },
+          undefined,
+          () => {
+            loadingSystem.resourceLoaded();
+            resolve();
+          }
+        );
       });
     });
 
@@ -1098,164 +1156,240 @@ const controlSystem = {
   }
 };
 
+const loadingSystem = {
+  totalResources: 0,
+  loadedResources: 0,
+  isLoading: false,
+  loadingElement: null,
+  startButton: null,
+
+  init: function() {
+    this.loadingElement = document.createElement('div');
+    this.loadingElement.id = 'loading-text';
+    this.loadingElement.style.cssText = SETTINGS.loadingText.style;
+    document.getElementById('start-screen').appendChild(this.loadingElement);
+    
+    this.startButton = document.getElementById('start-button');
+    this.startButton.disabled = true;
+    this.startButton.style.opacity = '0.5';
+    this.startButton.style.cursor = 'not-allowed';
+  },
+
+  startLoading: function() {
+    this.isLoading = true;
+    this.loadedResources = 0;
+    this.totalResources = 0;
+    this.loadingElement.style.opacity = '1';
+    this.updateLoadingText();
+  },
+
+  addResource: function() {
+    this.totalResources++;
+    this.updateLoadingText();
+  },
+
+  resourceLoaded: function() {
+    this.loadedResources++;
+    this.updateLoadingText();
+    
+    if (this.loadedResources >= this.totalResources) {
+      this.finishLoading();
+    }
+  },
+
+  updateLoadingText: function() {
+    const percentage = this.totalResources > 0 
+      ? Math.round((this.loadedResources / this.totalResources) * 100) 
+      : 0;
+    this.loadingElement.textContent = `Загрузка: ${percentage}%`;
+  },
+
+  finishLoading: function() {
+    this.isLoading = false;
+    this.loadingElement.style.opacity = '0';
+    this.startButton.disabled = false;
+    this.startButton.style.opacity = '1';
+    this.startButton.style.cursor = 'pointer';
+  }
+};
+
 const levelSystem = {
   load: function () {
     if (gameState.levelLoaded) return;
+    
+    loadingSystem.startLoading();
+    loadingSystem.addResource(); // For level model
 
     const textures = [
-      textureLoader.load('assets/textures/wood_floor.jpg'), // floorId = 0
-      textureLoader.load('assets/textures/grass_floor.png') // floorId = 1
+      textureLoader.load('assets/textures/wood_floor.jpg', 
+        () => loadingSystem.resourceLoaded(),
+        undefined,
+        () => loadingSystem.resourceLoaded()
+      ),
+      textureLoader.load('assets/textures/grass_floor.png',
+        () => loadingSystem.resourceLoaded(),
+        undefined,
+        () => loadingSystem.resourceLoaded()
+      )
     ];
+    loadingSystem.addResource(); // For wood floor texture
+    loadingSystem.addResource(); // For grass floor texture
+
     textures.forEach(t => {
       t.wrapS = THREE.RepeatWrapping;
       t.wrapT = THREE.RepeatWrapping;
     });
 
-    gltfLoader.load('assets/levels/level_2.glb', (gltf) => {
-      scene.add(gltf.scene);
+    gltfLoader.load('assets/levels/level_2.glb', 
+      (gltf) => {
+        scene.add(gltf.scene);
 
-      gltf.scene.traverse(child => {
-        if (child.isMesh && child.userData?.isFloor && child.userData.floorId !== undefined) {
-          const floorId = child.userData.floorId;
+        gltf.scene.traverse(child => {
+          if (child.isMesh && child.userData?.isFloor && child.userData.floorId !== undefined) {
+            const floorId = child.userData.floorId;
 
-          if (child.geometry.attributes.uv) {
-            const uvArray = child.geometry.attributes.uv.array;
-            const bbox = new THREE.Box3().setFromObject(child);
-            const size = new THREE.Vector3();
-            bbox.getSize(size);
+            if (child.geometry.attributes.uv) {
+              const uvArray = child.geometry.attributes.uv.array;
+              const bbox = new THREE.Box3().setFromObject(child);
+              const size = new THREE.Vector3();
+              bbox.getSize(size);
 
-            const scaleU = size.x / 2;
-            const scaleV = size.z / 2;
+              const scaleU = size.x / 2;
+              const scaleV = size.z / 2;
 
-            for (let i = 0; i < uvArray.length; i += 2) {
-              uvArray[i] *= scaleU;
-              uvArray[i + 1] *= scaleV;
+              for (let i = 0; i < uvArray.length; i += 2) {
+                uvArray[i] *= scaleU;
+                uvArray[i + 1] *= scaleV;
+              }
+
+              child.geometry.attributes.uv.needsUpdate = true;
             }
 
-            child.geometry.attributes.uv.needsUpdate = true;
-          }
-
-          child.material = new THREE.MeshStandardMaterial({
-            map: textures[floorId],
-            roughness: floorId === 0 ? 0.8 : 0.9,
-            metalness: floorId === 0 ? 0.2 : 0.1
-          });
-        }
-
-        if (child.userData?.isCollidable) {
-          child.box3 = new THREE.Box3().setFromObject(child);
-          collidableObjects.push(child);
-        }
-
-        if (child.userData?.isInteractable) {
-          interactableObjects.push(child);
-        }
-
-        if (child.userData?.isDoor) {
-          doors.push(child);
-          child.userData.isInteractable = true;
-          child.userData.isClosed = true;
-          collidableObjects.push(child);
-          
-          if (child.geometry) {
-            child.geometry.computeBoundingBox();
-          } else {
-            const tempBox = new THREE.Box3();
-            child.traverse(mesh => {
-              if (mesh.isMesh && mesh.geometry) {
-                mesh.geometry.computeBoundingBox();
-                tempBox.union(mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld));
-              }
-            });
-            child.geometry = new THREE.BoxGeometry();
-            child.geometry.boundingBox = tempBox;
-          }
-        }
-
-        if (child.userData?.isInvisibleWall) {
-          child.visible = false;
-        }
-
-        if (child.userData?.isSoundObject) {
-          audioSystem.addSoundObject(
-            child,
-            child.userData.id
-          ).catch(e => {
-            console.error("Ошибка создания звукового объекта:", e);
-          });
-        }
-
-        if (child.userData?.isLightSource) {
-          if (child.userData?.isRoomLamp) {
-            const lampLight = new THREE.SpotLight(
-              SETTINGS.lightSettings.roomLamp.color,
-              SETTINGS.lightSettings.roomLamp.intensity,
-              SETTINGS.lightSettings.roomLamp.distance,
-              SETTINGS.lightSettings.roomLamp.angle,
-              SETTINGS.lightSettings.roomLamp.penumbra,
-              SETTINGS.lightSettings.roomLamp.decay
-            );
-
-            lampLight.position.set(child.position.x, child.position.y - 0.5, child.position.z);
-            lampLight.target.position.set(child.position.x, child.position.y - 5, child.position.z);
-            lampLight.castShadow = false;
-            lampLight.visible = false;
-
-            child.userData.lampLight = lampLight;
-            scene.add(lampLight);
-            scene.add(lampLight.target);
-          }
-
-          if (child.userData?.isForestLamp) {
-            child.traverse(lightBulb => {
-              if (lightBulb.userData?.isLightBulb) {
-                const forestLight = new THREE.SpotLight(
-                  SETTINGS.lightSettings.forestLamp.color,
-                  SETTINGS.lightSettings.forestLamp.intensity,
-                  SETTINGS.lightSettings.forestLamp.distance,
-                  SETTINGS.lightSettings.forestLamp.angle,
-                  SETTINGS.lightSettings.forestLamp.penumbra,
-                  SETTINGS.lightSettings.forestLamp.decay
-                );
-
-                const worldPosition = new THREE.Vector3();
-                lightBulb.getWorldPosition(worldPosition);
-                forestLight.position.copy(worldPosition);
-
-                const targetPosition = new THREE.Vector3(
-                  worldPosition.x,
-                  worldPosition.y - 3,
-                  worldPosition.z
-                );
-
-                const targetObject = new THREE.Object3D();
-                targetObject.position.copy(targetPosition);
-                scene.add(targetObject);
-                forestLight.target = targetObject;
-
-                forestLight.visible = false;
-
-                forestLight.updateMatrixWorld();
-                targetObject.updateMatrixWorld();
-
-                lightBulb.userData.forestLight = forestLight;
-                child.userData.forestLight = forestLight;
-                child.userData.lightTarget = targetObject;
-
-                scene.add(forestLight);
-              }
+            child.material = new THREE.MeshStandardMaterial({
+              map: textures[floorId],
+              roughness: floorId === 0 ? 0.8 : 0.9,
+              metalness: floorId === 0 ? 0.2 : 0.1
             });
           }
+
+          if (child.userData?.isCollidable) {
+            child.box3 = new THREE.Box3().setFromObject(child);
+            collidableObjects.push(child);
+          }
+
+          if (child.userData?.isInteractable) {
+            interactableObjects.push(child);
+          }
+
+          if (child.userData?.isDoor) {
+            doors.push(child);
+            child.userData.isInteractable = true;
+            child.userData.isClosed = true;
+            collidableObjects.push(child);
+            
+            if (child.geometry) {
+              child.geometry.computeBoundingBox();
+            } else {
+              const tempBox = new THREE.Box3();
+              child.traverse(mesh => {
+                if (mesh.isMesh && mesh.geometry) {
+                  mesh.geometry.computeBoundingBox();
+                  tempBox.union(mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld));
+                }
+              });
+              child.geometry = new THREE.BoxGeometry();
+              child.geometry.boundingBox = tempBox;
+            }
+          }
+
+          if (child.userData?.isInvisibleWall) {
+            child.visible = false;
+          }
+
+          if (child.userData?.isSoundObject) {
+            audioSystem.addSoundObject(
+              child,
+              child.userData.id
+            ).catch(e => {
+              console.error("Ошибка создания звукового объекта:", e);
+            });
+          }
+
+          if (child.userData?.isLightSource) {
+            if (child.userData?.isRoomLamp) {
+              const lampLight = new THREE.SpotLight(
+                SETTINGS.lightSettings.roomLamp.color,
+                SETTINGS.lightSettings.roomLamp.intensity,
+                SETTINGS.lightSettings.roomLamp.distance,
+                SETTINGS.lightSettings.roomLamp.angle,
+                SETTINGS.lightSettings.roomLamp.penumbra,
+                SETTINGS.lightSettings.roomLamp.decay
+              );
+
+              lampLight.position.set(child.position.x, child.position.y - 0.5, child.position.z);
+              lampLight.target.position.set(child.position.x, child.position.y - 5, child.position.z);
+              lampLight.castShadow = false;
+              lampLight.visible = false;
+
+              child.userData.lampLight = lampLight;
+              scene.add(lampLight);
+              scene.add(lampLight.target);
+            }
+
+            if (child.userData?.isForestLamp) {
+              child.traverse(lightBulb => {
+                if (lightBulb.userData?.isLightBulb) {
+                  const forestLight = new THREE.SpotLight(
+                    SETTINGS.lightSettings.forestLamp.color,
+                    SETTINGS.lightSettings.forestLamp.intensity,
+                    SETTINGS.lightSettings.forestLamp.distance,
+                    SETTINGS.lightSettings.forestLamp.angle,
+                    SETTINGS.lightSettings.forestLamp.penumbra,
+                    SETTINGS.lightSettings.forestLamp.decay
+                  );
+
+                  const worldPosition = new THREE.Vector3();
+                  lightBulb.getWorldPosition(worldPosition);
+                  forestLight.position.copy(worldPosition);
+
+                  const targetPosition = new THREE.Vector3(
+                    worldPosition.x,
+                    worldPosition.y - 3,
+                    worldPosition.z
+                  );
+
+                  const targetObject = new THREE.Object3D();
+                  targetObject.position.copy(targetPosition);
+                  scene.add(targetObject);
+                  forestLight.target = targetObject;
+
+                  forestLight.visible = false;
+
+                  forestLight.updateMatrixWorld();
+                  targetObject.updateMatrixWorld();
+
+                  lightBulb.userData.forestLight = forestLight;
+                  child.userData.forestLight = forestLight;
+                  child.userData.lightTarget = targetObject;
+
+                  scene.add(forestLight);
+                }
+              });
+            }
+          }
+        });
+
+        if (gameState.showCollisionDebug) {
+          collisionSystem.createCollisionHelpers();
         }
-      });
 
-      if (gameState.showCollisionDebug) {
-        collisionSystem.createCollisionHelpers();
-      }
-
-      gameState.levelLoaded = true;
-      scene.fog = new THREE.Fog(0x9abfbf, 100, 100);
-    });
+        gameState.levelLoaded = true;
+        scene.fog = new THREE.Fog(0x9abfbf, 100, 100);
+        loadingSystem.resourceLoaded();
+      },
+      undefined,
+      () => loadingSystem.resourceLoaded()
+    );
   }
 };
 
@@ -1369,6 +1503,7 @@ function initGame() {
   playerSystem.loadPlayerModel();
   controlSystem.init();
   introSystem.init();
+  loadingSystem.init();
   levelSystem.load();
   THREE.RectAreaLightUniformsLib.init();
 
@@ -1376,22 +1511,13 @@ function initGame() {
   const startButton = document.getElementById('start-button');
 
   const handleStartGame = () => {
+    if (loadingSystem.isLoading) return;
+    
     resumeAudioContext();
-
     startScreen.style.display = 'none';
     gameState.gameStarted = true;
 
     audioSystem.init();
-    // phoneSystem.init();
-
-    audioSystem.loadAmbientMusic().then(() => {
-      const roomMusic = audioSystem.ambientMusic.tracks['room'];
-      if (roomMusic && !roomMusic.isPlaying) {
-        roomMusic.setVolume(SETTINGS.ambientMusic.room.volume);
-        roomMusic.play();
-      }
-    });
-
     zoneSystem.updateLighting(audioSystem.ambientMusic.currentZone);
 
     setTimeout(() => {
@@ -1473,6 +1599,7 @@ const introSystem = {
         color: orange;
         border: 1px solid white;
         border-radius: 5px;
+        transition: opacity 0.3s ease;
       ">НАЧАТЬ ДЕНЬ</button>
     `;
 
