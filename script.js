@@ -3,7 +3,7 @@ const SETTINGS = {
   rotationSpeed: 0.03,
   cameraDistance: 5,
   cameraHeight: 3,
-  interactionDistance: 2.5,
+  interactionDistance: 3,
   ditherPixelSize: 3,
   doorSoundVolume: 0.5,
   musicVolume: 0.001,
@@ -213,7 +213,6 @@ const audioSystem = {
   },
 
   playRandomStepSound: function () {
-    console.log(`currentSurfaceType - ${this.currentSurfaceType}`)
     const sounds = this.stepSounds[this.currentSurfaceType];
     if (!sounds || sounds.length === 0) return;
 
@@ -766,6 +765,11 @@ const playerSystem = {
 
   toggleDoor: function (door) {
     if (door.userData.isAnimating) return;
+    if (!door.geometry || !door.geometry.boundingBox) {
+      console.error('Door geometry or boundingBox is not available');
+      return;
+    }
+    
     door.userData.isAnimating = true;
 
     const isClosed = door.userData.isClosed;
@@ -777,7 +781,7 @@ const playerSystem = {
 
     const doorWidth = door.geometry.boundingBox.max.x - door.geometry.boundingBox.min.x;
     const doorLength = door.geometry.boundingBox.max.z - door.geometry.boundingBox.min.z;
-    const isUsingWidth = doorWidth > 0.01
+    const isUsingWidth = doorWidth > 0.4
     const usedDimension = isUsingWidth ? doorWidth : doorLength
     const offset = isLeftHanded ? - usedDimension / 2 : usedDimension / 2;
 
@@ -1152,6 +1156,20 @@ const levelSystem = {
           child.userData.isInteractable = true;
           child.userData.isClosed = true;
           collidableObjects.push(child);
+          
+          if (child.geometry) {
+            child.geometry.computeBoundingBox();
+          } else {
+            const tempBox = new THREE.Box3();
+            child.traverse(mesh => {
+              if (mesh.isMesh && mesh.geometry) {
+                mesh.geometry.computeBoundingBox();
+                tempBox.union(mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld));
+              }
+            });
+            child.geometry = new THREE.BoxGeometry();
+            child.geometry.boundingBox = tempBox;
+          }
         }
 
         if (child.userData?.isInvisibleWall) {
