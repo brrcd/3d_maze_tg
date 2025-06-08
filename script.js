@@ -291,7 +291,7 @@ const audioSystem = {
         break;
       case 2: soundPath = "assets/audio/music/picture_3.mp3";
         break;
-      case 3: soundPath = "assets/audio/music/picture_4.mp3";
+      case 3: soundPath = "assets/audio/music/picture_8.mp3";
         break;
       case 4: soundPath = "assets/audio/music/picture_5.mp3";
         break;
@@ -299,7 +299,7 @@ const audioSystem = {
         break;
       case 6: soundPath = "assets/audio/music/picture_7.mp3";
         break;
-      case 7: soundPath = "assets/audio/music/picture_8.mp3";
+      case 7: soundPath = "assets/audio/music/picture_4.mp3";
         break;
       case 8: soundPath = "assets/audio/music/picture_9.mp3";
         break;
