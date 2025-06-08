@@ -109,6 +109,34 @@ const SETTINGS = {
       opacity: 0;
       transition: opacity 0.3s ease;
     `
+  },
+  roomSettings: {
+    ambientMusic: {
+      room: {
+        path: 'assets/audio/ambient/room.mp3',
+        volume: 0.2
+      },
+      corridor: {
+        path: 'assets/audio/ambient/corridor.mp3',
+        volume: 0.2
+      },
+      forest: {
+        path: 'assets/audio/ambient/forest.mp3',
+        volume: 0.2
+      },
+      fadeDuration: 2.0
+    },
+    stepSounds: {
+      wood: {
+        type: 'wood',
+        volume: 0.3
+      },
+      forest: {
+        type: 'forest',
+        volume: 0.3
+      }
+    },
+    checkInterval: 500 // Check room every 500ms
   }
 };
 
@@ -192,74 +220,141 @@ const audioSystem = {
   currentSoundVolume: 0,
 
   init: function () {
-    loadingSystem.startLoading();
-    
-    // Count step sounds
-    for (const surfaceType in SETTINGS.stepSoundPaths) {
-      SETTINGS.stepSoundPaths[surfaceType].forEach(() => {
+    return new Promise((resolve) => {
+      loadingSystem.startLoading();
+      
+      // Count step sounds
+      for (const surfaceType in SETTINGS.stepSoundPaths) {
+        SETTINGS.stepSoundPaths[surfaceType].forEach(() => {
+          loadingSystem.addResource();
+        });
+      }
+      
+      // Add door sounds
+      loadingSystem.addResource(); // For door open
+      loadingSystem.addResource(); // For door close
+      
+      // Add ambient music
+      SETTINGS.zones.forEach(() => {
         loadingSystem.addResource();
       });
-    }
-    
-    // Add door sounds
-    loadingSystem.addResource(); // For door open
-    loadingSystem.addResource(); // For door close
-    
-    // Add ambient music
-    SETTINGS.zones.forEach(() => {
-      loadingSystem.addResource();
-    });
 
-    for (const surfaceType in SETTINGS.stepSoundPaths) {
-      this.stepSounds[surfaceType] = [];
-      this.loadStepSounds(surfaceType);
-    }
-    this.loadDoorSounds();
-    this.loadAmbientMusic().then(() => {
-      this.sound.setVolume(0);
+      const loadPromises = [];
+
+      // Load step sounds
+      for (const surfaceType in SETTINGS.stepSoundPaths) {
+        this.stepSounds[surfaceType] = [];
+        loadPromises.push(this.loadStepSounds(surfaceType));
+      }
+
+      // Load door sounds
+      loadPromises.push(this.loadDoorSounds());
+
+      // Load ambient music
+      loadPromises.push(this.loadAmbientMusic());
+
+      Promise.all(loadPromises).then(() => {
+        this.sound.setVolume(0);
+        resolve();
+      });
     });
   },
 
   loadStepSounds: function (surfaceType) {
-    SETTINGS.stepSoundPaths[surfaceType].forEach((path, index) => {
-      const stepSound = new THREE.Audio(audioListener);
-      audioLoader.load(path, 
-        (buffer) => {
-          stepSound.setBuffer(buffer);
-          stepSound.setVolume(SETTINGS.stepSoundVolumes[surfaceType]);
-          this.stepSounds[surfaceType][index] = stepSound;
-          loadingSystem.resourceLoaded();
-        },
-        undefined,
-        () => loadingSystem.resourceLoaded()
-      );
+    return new Promise((resolve) => {
+      const loadPromises = SETTINGS.stepSoundPaths[surfaceType].map((path, index) => {
+        return new Promise((resolveStep) => {
+          const stepSound = new THREE.Audio(audioListener);
+          audioLoader.load(path, 
+            (buffer) => {
+              stepSound.setBuffer(buffer);
+              stepSound.setVolume(SETTINGS.stepSoundVolumes[surfaceType]);
+              this.stepSounds[surfaceType][index] = stepSound;
+              loadingSystem.resourceLoaded();
+              resolveStep();
+            },
+            undefined,
+            () => {
+              loadingSystem.resourceLoaded();
+              resolveStep();
+            }
+          );
+        });
+      });
+
+      Promise.all(loadPromises).then(resolve);
     });
   },
 
   loadDoorSounds: function () {
-    audioLoader.load('assets/audio/door/door_open.mp3', 
-      (buffer) => {
-        const openSound = new THREE.Audio(audioListener);
-        openSound.setBuffer(buffer);
-        openSound.setVolume(SETTINGS.doorSoundVolume);
-        this.doorSounds.open = openSound;
-        loadingSystem.resourceLoaded();
-      },
-      undefined,
-      () => loadingSystem.resourceLoaded()
-    );
+    return new Promise((resolve) => {
+      const loadPromises = [
+        new Promise((resolveOpen) => {
+          audioLoader.load('assets/audio/door/door_open.mp3', 
+            (buffer) => {
+              const openSound = new THREE.Audio(audioListener);
+              openSound.setBuffer(buffer);
+              openSound.setVolume(SETTINGS.doorSoundVolume);
+              this.doorSounds.open = openSound;
+              loadingSystem.resourceLoaded();
+              resolveOpen();
+            },
+            undefined,
+            () => {
+              loadingSystem.resourceLoaded();
+              resolveOpen();
+            }
+          );
+        }),
+        new Promise((resolveClose) => {
+          audioLoader.load('assets/audio/door/door_close.mp3', 
+            (buffer) => {
+              const closeSound = new THREE.Audio(audioListener);
+              closeSound.setBuffer(buffer);
+              closeSound.setVolume(SETTINGS.doorSoundVolume);
+              this.doorSounds.close = closeSound;
+              loadingSystem.resourceLoaded();
+              resolveClose();
+            },
+            undefined,
+            () => {
+              loadingSystem.resourceLoaded();
+              resolveClose();
+            }
+          );
+        })
+      ];
 
-    audioLoader.load('assets/audio/door/door_close.mp3', 
-      (buffer) => {
-        const closeSound = new THREE.Audio(audioListener);
-        closeSound.setBuffer(buffer);
-        closeSound.setVolume(SETTINGS.doorSoundVolume);
-        this.doorSounds.close = closeSound;
-        loadingSystem.resourceLoaded();
-      },
-      undefined,
-      () => loadingSystem.resourceLoaded()
-    );
+      Promise.all(loadPromises).then(resolve);
+    });
+  },
+
+  loadAmbientMusic: function () {
+    return new Promise((resolve) => {
+      const promises = SETTINGS.zones.map(zone => {
+        return new Promise((resolveZone) => {
+          audioLoader.load(SETTINGS.ambientMusic[zone].path, 
+            (buffer) => {
+              const sound = new THREE.Audio(audioListener);
+              sound.setBuffer(buffer);
+              sound.setLoop(true);
+              sound.setVolume(0);
+              sound.zone = zone;
+              this.ambientMusic.tracks[zone] = sound;
+              loadingSystem.resourceLoaded();
+              resolveZone();
+            },
+            undefined,
+            () => {
+              loadingSystem.resourceLoaded();
+              resolveZone();
+            }
+          );
+        });
+      });
+
+      Promise.all(promises).then(resolve);
+    });
   },
 
   playRandomStepSound: function () {
@@ -277,34 +372,18 @@ const audioSystem = {
     }
   },
 
-  loadAmbientMusic: function () {
-    const promises = SETTINGS.zones.map(zone => {
-      return new Promise((resolve) => {
-        audioLoader.load(SETTINGS.ambientMusic[zone].path, 
-          (buffer) => {
-            const sound = new THREE.Audio(audioListener);
-            sound.setBuffer(buffer);
-            sound.setLoop(true);
-            sound.setVolume(0);
-            sound.zone = zone;
-            this.ambientMusic.tracks[zone] = sound;
-            loadingSystem.resourceLoaded();
-            resolve();
-          },
-          undefined,
-          () => {
-            loadingSystem.resourceLoaded();
-            resolve();
-          }
-        );
-      });
-    });
-
-    return Promise.all(promises);
-  },
-
   switchToZone: function (newZone) {
-    if (this.ambientMusic.currentZone === newZone || this.ambientMusic.isTransitioning) return;
+    console.log('Switching to zone:', newZone, 'Current zone:', this.ambientMusic.currentZone);
+    
+    if (this.ambientMusic.currentZone === newZone) {
+      console.log('Already in this zone, skipping switch');
+      return;
+    }
+
+    if (this.ambientMusic.isTransitioning) {
+      console.log('Already transitioning, skipping switch');
+      return;
+    }
 
     this.ambientMusic.isTransitioning = true;
     this.ambientMusic.transitionStartTime = Date.now();
@@ -312,7 +391,15 @@ const audioSystem = {
     this.ambientMusic.toTrack = this.ambientMusic.tracks[newZone];
     this.ambientMusic.currentZone = newZone;
 
+    console.log('Starting music transition:', {
+      fromTrack: this.ambientMusic.fromTrack?.zone,
+      toTrack: this.ambientMusic.toTrack?.zone,
+      fromVolume: this.ambientMusic.fromTrack?.getVolume(),
+      toVolume: this.ambientMusic.toTrack?.getVolume()
+    });
+
     if (!this.ambientMusic.toTrack.isPlaying) {
+      console.log('Starting playback of new track');
       this.ambientMusic.toTrack.play();
     }
   },
@@ -332,6 +419,7 @@ const audioSystem = {
     this.ambientMusic.toTrack.setVolume(THREE.MathUtils.lerp(0, toVolume, progress));
 
     if (progress >= 1) {
+      console.log('Music transition complete');
       this.ambientMusic.isTransitioning = false;
       if (this.ambientMusic.fromTrack) {
         this.ambientMusic.fromTrack.pause();
@@ -1398,86 +1486,135 @@ const levelSystem = {
   }
 };
 
-const zoneSystem = {
-  triggers: [],
-  lastTrigger: null,
-  lastTriggerTime: 0,
+const roomSystem = {
+  currentRoomId: null,
+  lastCheckTime: 0,
+  roomBoxes: [],
 
-  init: function () {
-    this.findTriggers();
+  init: function() {
+    this.findRoomBoxes();
+    this.startRoomCheck();
+    this.updateFog(0);
   },
 
-  findTriggers: function () {
+  findRoomBoxes: function() {
     scene.traverse((child) => {
-      if (child.userData.isAmbientMusicSwitchTrigger) {
+      if (child.userData.areaId !== undefined) {
+        if (!child.geometry) return;
+
         child.box3 = new THREE.Box3().setFromObject(child);
+        child.box3.expandByScalar(0.5);
         child.visible = false;
-        this.triggers.push(child);
+        this.roomBoxes.push(child);
+
+        if (gameState.showCollisionDebug) {
+          const helper = new THREE.Box3Helper(child.box3, 0x00ff00);
+          scene.add(helper);
+        }
       }
     });
   },
 
-  checkPlayerPosition: function (playerPosition) {
-    if (!gameState.playerReady) return;
+  startRoomCheck: function() {
+    setInterval(() => {
+      if (!gameState.playerReady || !gameState.gameStarted) return;
+      this.checkCurrentRoom();
+    }, SETTINGS.roomSettings.checkInterval);
+  },
 
-    const now = Date.now();
-    if (now - this.lastTriggerTime < 1000) return;
+  checkCurrentRoom: function() {
+    if (!playerSystem.player) return;
 
-    const playerSize = new THREE.Vector3(0.8, 1.5, 0.8);
+    const playerPosition = playerSystem.player.position;
+    const playerSize = new THREE.Vector3(0.3, 1.0, 0.3);
     const playerBox = new THREE.Box3(
       playerPosition.clone().sub(playerSize),
       playerPosition.clone().add(playerSize)
     );
 
-    for (const trigger of this.triggers) {
-      if (playerBox.intersectsBox(trigger.box3) && trigger !== this.lastTrigger) {
-        this.lastTrigger = trigger;
-        this.lastTriggerTime = now;
-        this.handleZoneTransition(playerPosition, trigger);
-        break;
-      }
-    }
-  },
-
-  handleZoneTransition: function (playerPosition, trigger) {
-    const fromZone = audioSystem.ambientMusic.currentZone;
-    let toZone;
-
-    if (fromZone === trigger.userData.zoneA) {
-      return;
-    } else {
-      toZone = trigger.userData.zoneA;
-    }
-    audioSystem.switchToZone(toZone);
-
-    // Update step sound based on zone
-    if (toZone === 'forest') {
-      audioSystem.currentSurfaceType = 'forest';
-    } else {
-      audioSystem.currentSurfaceType = 'wood';
+    if (gameState.showCollisionDebug) {
+      const playerHelper = new THREE.Box3Helper(playerBox, 0xff0000);
+      scene.add(playerHelper);
+      setTimeout(() => scene.remove(playerHelper), 100);
     }
 
-    this.updateLighting(toZone);
-    this.updateFog(toZone);
-  },
+    let newRoomId = null;
+    let closestRoom = null;
+    let closestDistance = Infinity;
 
-  updateLighting: function (zone) {
-    scene.traverse(child => {
-      if (child.userData?.isLightSource && child.userData?.isRoomLamp) {
-        if (child.userData.lampLight) {
-          child.userData.lampLight.visible = (zone === 'room');
+    for (const roomBox of this.roomBoxes) {
+      if (playerBox.intersectsBox(roomBox.box3)) {
+        const roomCenter = new THREE.Vector3();
+        roomBox.box3.getCenter(roomCenter);
+        const distance = playerPosition.distanceTo(roomCenter);
+
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestRoom = roomBox;
+          newRoomId = roomBox.userData.areaId;
         }
       }
-      if (child.userData?.isLightSource && child.userData?.isForestLamp) {
-        if (child.userData.forestLight) {
-          child.userData.forestLight.visible = (zone === 'forest');
+    }
+
+    if (newRoomId !== this.currentRoomId) {
+      this.currentRoomId = newRoomId;
+      this.handleRoomChange();
+    }
+  },
+
+  handleRoomChange: function() {
+    if (this.currentRoomId === null) return;
+
+    let musicZone;
+    if (this.currentRoomId === 0) {
+      musicZone = 'room';
+    } else if (this.currentRoomId === 6) {
+      musicZone = 'forest';
+    } else {
+      musicZone = 'corridor';
+    }
+
+    if (!audioSystem.ambientMusic.tracks[musicZone]) return;
+
+    const track = audioSystem.ambientMusic.tracks[musicZone];
+    if (!track.isPlaying) {
+      track.play();
+      track.setVolume(SETTINGS.ambientMusic[musicZone].volume);
+    }
+
+    audioSystem.switchToZone(musicZone);
+
+    const stepType = this.currentRoomId === 6 ? 'forest' : 'wood';
+    audioSystem.currentSurfaceType = stepType;
+
+    this.updateLighting();
+    this.updateFog(this.currentRoomId);
+  },
+
+  updateLighting: function() {
+    const isForest = this.currentRoomId === 6;
+    const isRoom = this.currentRoomId === 0;
+
+    scene.traverse(child => {
+      if (child.userData?.isLightSource) {
+        if (child.userData?.isRoomLamp && child.userData.lampLight) {
+          child.userData.lampLight.visible = isRoom;
+        }
+        if (child.userData?.isForestLamp && child.userData.forestLight) {
+          child.userData.forestLight.visible = isForest;
         }
       }
     });
   },
 
-  updateFog: function (zone) {
-    const fogSettings = SETTINGS.fogSettings[zone];
+  updateFog: function(roomId) {
+    let fogSettings;
+    if (roomId === 6) {
+      fogSettings = SETTINGS.fogSettings.forest;
+    } else {
+      fogSettings = SETTINGS.fogSettings.room;
+    }
+
     if (!fogSettings || !scene.fog) return;
 
     const duration = 1500;
@@ -1515,20 +1652,31 @@ function initGame() {
   const startScreen = document.getElementById('start-screen');
   const startButton = document.getElementById('start-button');
 
-  const handleStartGame = () => {
+  const handleStartGame = async () => {
     if (loadingSystem.isLoading) return;
     
     resumeAudioContext();
     startScreen.style.display = 'none';
     gameState.gameStarted = true;
 
-    audioSystem.init();
-    zoneSystem.updateLighting(audioSystem.ambientMusic.currentZone);
+    try {
+      await audioSystem.init();
+      roomSystem.init();
+      
+      const initialMusicZone = 'room';
+      if (audioSystem.ambientMusic.tracks[initialMusicZone]) {
+        const track = audioSystem.ambientMusic.tracks[initialMusicZone];
+        track.play();
+        track.setVolume(SETTINGS.ambientMusic[initialMusicZone].volume);
+        audioSystem.ambientMusic.currentZone = initialMusicZone;
+      }
 
-    setTimeout(() => {
-      phoneSystem.startCall();
-    }, SETTINGS.startPhone.startRingingDelay);
-    zoneSystem.init();
+      setTimeout(() => {
+        phoneSystem.startCall();
+      }, SETTINGS.startPhone.startRingingDelay);
+    } catch (error) {
+      console.error('Error during game initialization:', error);
+    }
   };
 
   startButton.addEventListener('click', handleStartGame);
@@ -1557,7 +1705,6 @@ function gameLoop(currentTime) {
     playerSystem.handleMovement();
     playerSystem.updateCamera();
     playerSystem.checkInteractableProximity();
-    zoneSystem.checkPlayerPosition(playerSystem.player.position);
     audioSystem.updateSoundObjects(playerSystem.player.position);
   }
   if (audioSystem.activeSoundObject) {
