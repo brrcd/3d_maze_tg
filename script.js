@@ -2509,13 +2509,16 @@ const phoneDialogSystem = {
         clearInterval(this.typingInterval);
         this.isTyping = false;
 
-        setTimeout(() => {
-          if (this.currentPhraseIndex < phoneCall.phrases.length - 1) {
+        // Если это последняя фраза, запускаем таймер для закрытия диалога
+        if (this.currentPhraseIndex === phoneCall.phrases.length - 1) {
+          setTimeout(() => this.endDialog(), phoneCall.phraseDelay);
+        } else {
+          setTimeout(() => {
             textElement.textContent = '';
             this.currentPhraseIndex++;
             this.startTyping();
-          }
-        }, phoneCall.phraseDelay);
+          }, phoneCall.phraseDelay);
+        }
       }
     }, phoneCall.typingSpeed);
   },
