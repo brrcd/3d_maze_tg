@@ -1031,10 +1031,8 @@ const playerSystem = {
     let closestDistance = Infinity;
     let closestObject = null;
 
-    console.log('Checking interactable objects:', interactableObjects);
     interactableObjects.forEach(obj => {
       const distance = this.player.position.distanceTo(obj.position);
-      console.log('Object:', obj.name || 'unnamed', 'distance:', distance, 'isRinging:', obj.userData.isRinging);
       if (distance < closestDistance) {
         closestDistance = distance;
         closestObject = obj;
@@ -1042,7 +1040,6 @@ const playerSystem = {
     });
 
     const isClose = closestDistance < SETTINGS.interactionDistance;
-    console.log('Closest object:', closestObject?.name || 'none', 'distance:', closestDistance, 'isClose:', isClose);
     this.currentInteractable = isClose ? closestObject : null;
 
     const actionButton = document.getElementById('action-button');
@@ -1286,11 +1283,7 @@ const postProcessingSystem = {
 
   init: function () {
     if (this.isInitialized) return;
-    
-    if (performanceSystem.isLowEndDevice && !SETTINGS.renderer.enablePostProcessing) {
-      this.isInitialized = true;
-      return;
-    }
+  
 
     try {
       const renderTarget = new THREE.WebGLRenderTarget(
@@ -1985,28 +1978,7 @@ const roomSystem = {
   }
 };
 
-const performanceSystem = {
-  isLowEndDevice: false,
-  
-  init: function() {
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const hasLowMemory = navigator.deviceMemory && navigator.deviceMemory < 4;
-    const hasLowCores = navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4;
-    
-    this.isLowEndDevice = isMobile || hasLowMemory || hasLowCores;
-    
-    if (this.isLowEndDevice) {
-      SETTINGS.renderer.pixelRatio = 1;
-      SETTINGS.renderer.maxFPS = 30;
-      SETTINGS.renderer.enablePostProcessing = false;
-      SETTINGS.ditherPixelSize = 4;
-    }
-  }
-};
-
 function initGame() {
-  performanceSystem.init();
-  
   introSystem.init();
   loadingSystem.init();
   
@@ -2291,16 +2263,13 @@ const phoneSystem = {
     });
   },
   findPhoneObject: function () {
-    console.log('Searching for phone object...');
     let found = false;
     scene.traverse((child) => {
       if (child.userData.isStartingPhone) {
-        console.log('Found phone object:', child);
         this.phoneObject = child;
         child.userData.isInteractable = true;
         interactableObjects.push(child);
         found = true;
-        console.log('Phone added to interactable objects. Current interactable objects:', interactableObjects);
       }
     });
     if (!found) {
