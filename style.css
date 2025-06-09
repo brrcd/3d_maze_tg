@@ -106,6 +106,13 @@ body {
   align-items: center;
   z-index: 1000;
   /* Чтобы экран был поверх всего */
+  opacity: 1;
+  transition: opacity 1.5s ease-out;
+}
+
+#start-screen.fade-out {
+  opacity: 0;
+  pointer-events: none;
 }
 
 #start-menu {

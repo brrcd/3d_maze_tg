@@ -1031,8 +1031,10 @@ const playerSystem = {
     let closestDistance = Infinity;
     let closestObject = null;
 
+    console.log('Checking interactable objects:', interactableObjects);
     interactableObjects.forEach(obj => {
       const distance = this.player.position.distanceTo(obj.position);
+      console.log('Object:', obj.name || 'unnamed', 'distance:', distance, 'isRinging:', obj.userData.isRinging);
       if (distance < closestDistance) {
         closestDistance = distance;
         closestObject = obj;
@@ -1040,6 +1042,7 @@ const playerSystem = {
     });
 
     const isClose = closestDistance < SETTINGS.interactionDistance;
+    console.log('Closest object:', closestObject?.name || 'none', 'distance:', closestDistance, 'isClose:', isClose);
     this.currentInteractable = isClose ? closestObject : null;
 
     const actionButton = document.getElementById('action-button');
@@ -1883,7 +1886,6 @@ const roomSystem = {
     );
 
     let newRoomId = null;
-    let closestRoom = null;
     let closestDistance = Infinity;
 
     for (const roomBox of this.roomBoxes) {
@@ -1894,7 +1896,6 @@ const roomSystem = {
 
         if (distance < closestDistance) {
           closestDistance = distance;
-          closestRoom = roomBox;
           newRoomId = roomBox.userData.areaId;
         }
       }
@@ -2089,27 +2090,35 @@ function initGame() {
     }
     
     resumeAudioContext();
-    startScreen.style.display = 'none';
     
-    try {
-      roomSystem.init();
-      gameState.gameStarted = true;
+    // Add fade-out class for smooth transition
+    startScreen.classList.add('fade-out');
+    
+    // Wait for transition to complete before hiding the screen
+    setTimeout(() => {
+      startScreen.style.display = 'none';
       
-      const initialMusicZone = 'room';
-      if (audioSystem.ambientMusic.tracks[initialMusicZone]) {
-        const track = audioSystem.ambientMusic.tracks[initialMusicZone];
-        track.play();
-        track.setVolume(SETTINGS.ambientMusic[initialMusicZone].volume);
-        audioSystem.ambientMusic.currentZone = initialMusicZone;
-      }
+      try {
+        roomSystem.init();
+        phoneSystem.init();
+        gameState.gameStarted = true;
+        
+        const initialMusicZone = 'room';
+        if (audioSystem.ambientMusic.tracks[initialMusicZone]) {
+          const track = audioSystem.ambientMusic.tracks[initialMusicZone];
+          track.play();
+          track.setVolume(SETTINGS.ambientMusic[initialMusicZone].volume);
+          audioSystem.ambientMusic.currentZone = initialMusicZone;
+        }
 
-      setTimeout(() => {
-        phoneSystem.startCall();
-      }, SETTINGS.startPhone.startRingingDelay);
-      
-    } catch (error) {
-      console.error('Error starting game:', error);
-    }
+        setTimeout(() => {
+          phoneSystem.startCall();
+        }, SETTINGS.startPhone.startRingingDelay);
+        
+      } catch (error) {
+        console.error('Error starting game:', error);
+      }
+    }, 1500); // Match this with the CSS transition duration
   };
   
   startButton.addEventListener('click', handleStartGame);
@@ -2282,13 +2291,21 @@ const phoneSystem = {
     });
   },
   findPhoneObject: function () {
+    console.log('Searching for phone object...');
+    let found = false;
     scene.traverse((child) => {
       if (child.userData.isStartingPhone) {
+        console.log('Found phone object:', child);
         this.phoneObject = child;
         child.userData.isInteractable = true;
         interactableObjects.push(child);
+        found = true;
+        console.log('Phone added to interactable objects. Current interactable objects:', interactableObjects);
       }
     });
+    if (!found) {
+      console.warn('Phone object not found in scene!');
+    }
   },
   startCall: function () {
     if (!gameState.gameStarted) return;
