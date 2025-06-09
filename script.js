@@ -205,7 +205,7 @@ const audioListener = new THREE.AudioListener();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.add(audioListener);
 
-scene.add(new THREE.AmbientLight(0xFFFFFF, 0.5));
+scene.add(new THREE.AmbientLight(0xFFFFFF, 1));
 const debugSphere = new THREE.Mesh(
   new THREE.SphereGeometry(0.5),
   new THREE.MeshBasicMaterial({ color: 0xff0000 })
@@ -1980,6 +1980,8 @@ const roomSystem = {
   },
 
   updateLighting: function() {
+    // Temporarily disabled lighting updates for performance
+    /*
     const isForest = this.currentRoomId === 6;
     const currentRoomId = this.currentRoomId;
 
@@ -1993,6 +1995,7 @@ const roomSystem = {
         }
       }
     });
+    */
   },
 
   updateFog: function(roomId) {
