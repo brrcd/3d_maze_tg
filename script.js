@@ -1528,7 +1528,7 @@ const levelSystem = {
           }
 
           if (child.userData?.isLightSource) {
-            if (child.userData?.isRoomLamp) {
+            if (child.userData?.roomLightId !== undefined) {
               const lampLight = new THREE.SpotLight(
                 SETTINGS.lightSettings.roomLamp.color,
                 SETTINGS.lightSettings.roomLamp.intensity,
@@ -1706,12 +1706,12 @@ const roomSystem = {
 
   updateLighting: function() {
     const isForest = this.currentRoomId === 6;
-    const isRoom = this.currentRoomId === 0;
+    const currentRoomId = this.currentRoomId;
 
     scene.traverse(child => {
       if (child.userData?.isLightSource) {
-        if (child.userData?.isRoomLamp && child.userData.lampLight) {
-          child.userData.lampLight.visible = isRoom;
+        if (child.userData?.roomLightId !== undefined && child.userData.lampLight) {
+          child.userData.lampLight.visible = child.userData.roomLightId === currentRoomId;
         }
         if (child.userData?.isForestLamp && child.userData.forestLight) {
           child.userData.forestLight.visible = isForest;
