@@ -1,5 +1,5 @@
 const SETTINGS = {
-  movementSpeed: 0.15,
+  movementSpeed: 0.17,
   rotationSpeed: 0.03,
   cameraDistance: 5,
   cameraHeight: 3,
@@ -139,7 +139,7 @@ const SETTINGS = {
     checkInterval: 500
   },
   renderer: {
-    pixelRatio: 3,
+    pixelRatio: 4,
     antialias: false,
     powerPreference: "low-power",
     maxFPS: 60,
