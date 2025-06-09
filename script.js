@@ -8,9 +8,9 @@ const SETTINGS = {
   doorSoundVolume: 0.5,
   musicVolume: 0.001,
   introPhrases: [
-    "Добро пожаловать в лабораторию",
-    "Здесь происходят странные вещи",
-    "Сможете ли вы найти выход?",
+    "срочно, включи звук на своём устройстве, это важно. тут будут происходить малообъяснимые вещи, постарайся в этом не заблудиться. пожалуйста, будь внимательным и предсказуемым, ничего не разбей и не споткнись, иначе произойдет нечто непредвиденное.",
+    "это моя первая игра. и каждый сантиметр этой игры был сделан с любовью. тут ты сможешь расхаживать по коридорам, комнатам, улицам, любуясь картинами, и наслаждаясь новыми песнями с альбома «ЗЕМЛЯНИКА». вообщем, чувствуй себя как дома! но знай, не все двери хотят быть открытыми. и вот еще что, не поднимай трубки от незнакомых, а то это уже начинает раздражать.",
+    "давай подождем, пока этот гребаный мир прогрузится",
   ],
   typingSpeed: 50,
   phraseDelay: 2000,
@@ -653,13 +653,9 @@ const animationSystem = {
   },
 
   playAnimation: function (name, force = false) {
-    const now = Date.now();
-    const timeSinceLastChange = now - this.lastAnimationChange;
-
     if (!this.animations[name] || !this.mixer) {
       return;
     }
-
 
     if (name === 'Running' && this.lastAnimation === 'Running' && !force) {
       return;
@@ -691,7 +687,6 @@ const animationSystem = {
       .play();
 
     this.lastAnimation = name;
-    this.lastAnimationChange = now;
   },
 
   playRandomIdleAnimation: function() {
