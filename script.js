@@ -495,8 +495,7 @@ const audioSystem = {
       }
       this.isIdle = false;
       this.idleStartTime = null;
-      // Reset to idle animation when moving
-      animationSystem.playAnimation('Idle');
+      animationSystem.playAnimation('Running');
     } else if (this.activeSoundObject) {
       const distanceToSound = playerPosition.distanceTo(this.activeSoundObject.object.position);
       
@@ -638,7 +637,7 @@ const animationSystem = {
   isPlayingIdleAnimation: false,
   isRunning: false,
   lastAnimationChange: 0,
-  animationChangeCooldown: 650,
+  animationChangeCooldown: 350,
   idleAnimations: [
     'Hip_Hop_Dancing',
     'Listening_To_Music',
@@ -661,11 +660,12 @@ const animationSystem = {
       return;
     }
 
-    if (!force && this.lastAnimation === name) {
+
+    if (name === 'Running' && this.lastAnimation === 'Running' && !force) {
       return;
     }
 
-    if (!force && timeSinceLastChange < this.animationChangeCooldown) {
+    if (!force && this.lastAnimation === name) {
       return;
     }
 
@@ -687,7 +687,7 @@ const animationSystem = {
     this.currentAction.reset()
       .setEffectiveTimeScale(1)
       .setEffectiveWeight(1)
-      // .fadeIn(0.2)
+      .fadeIn(0.2)
       .play();
 
     this.lastAnimation = name;
