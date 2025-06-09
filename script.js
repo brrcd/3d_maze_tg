@@ -1465,7 +1465,19 @@ const loadingSystem = {
   init: function() {
     this.loadingElement = document.createElement('div');
     this.loadingElement.id = 'loading-text';
-    this.loadingElement.style.cssText = SETTINGS.loadingText.style;
+    this.loadingElement.style.cssText = `
+      position: absolute;
+      top: 10%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: orange;
+      font-family: 'Courier New', monospace;
+      font-size: 18px;
+      text-align: center;
+      width: 80%;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    `;
     document.getElementById('start-screen').appendChild(this.loadingElement);
     
     this.priorityResources = [
@@ -1495,30 +1507,24 @@ const loadingSystem = {
   resourceLoaded: function() {
     this.loadedResources++;
     this.updateLoadingText();
-    
-    if (this.loadedResources >= this.totalResources) {
-      this.finishLoading();
-    }
   },
   
   updateLoadingText: function() {
     const percentage = this.totalResources > 0 
       ? Math.round((this.loadedResources / this.totalResources) * 100) 
       : 0;
-    this.loadingElement.textContent = `Загрузка: ${percentage}%`;
+    
+    if (this.totalResources > 0) {
+      this.loadingElement.textContent = `Загрузка: ${percentage}%`;
+      this.loadingElement.style.opacity = '1';
+    } else {
+      this.loadingElement.style.opacity = '0';
+    }
   },
   
   finishLoading: function() {
     this.isLoading = false;
     this.loadingElement.style.opacity = '0';
-    
-    const startButton = document.getElementById('start-button');
-    if (startButton) {
-      startButton.disabled = false;
-      startButton.style.opacity = '1';
-      startButton.style.cursor = 'pointer';
-      startButton.style.pointerEvents = 'auto';
-    }
   },
   
   loadPriorityResources: function() {
@@ -1995,17 +2001,79 @@ function initGame() {
   const startScreen = document.getElementById('start-screen');
   const startButton = document.getElementById('start-button');
   
-  loadingSystem.loadPriorityResources().catch(() => {
-    if (startButton) {
-      startButton.disabled = false;
-      startButton.style.opacity = '1';
-      startButton.style.cursor = 'pointer';
-      startButton.style.pointerEvents = 'auto';
+  // Start loading all resources immediately
+  const loadAllResources = async () => {
+    try {
+      loadingSystem.startLoading();
+      
+      // Load priority resources first
+      await loadingSystem.loadPriorityResources();
+      
+      // Initialize systems that don't depend on resources
+      postProcessingSystem.init();
+      controlSystem.init();
+      THREE.RectAreaLightUniformsLib.init();
+      
+      // Start loading deferred resources
+      loadingSystem.loadDeferredResources();
+      
+      // Load player model and level in parallel
+      await Promise.all([
+        new Promise(resolve => {
+          playerSystem.loadPlayerModel();
+          const checkPlayerLoaded = setInterval(() => {
+            if (gameState.playerReady) {
+              clearInterval(checkPlayerLoaded);
+              resolve();
+            }
+          }, 100);
+        }),
+        new Promise(resolve => {
+          levelSystem.load();
+          const checkLevelLoaded = setInterval(() => {
+            if (gameState.levelLoaded) {
+              clearInterval(checkLevelLoaded);
+              resolve();
+            }
+          }, 100);
+        })
+      ]);
+      
+      // Initialize audio system
+      await audioSystem.init();
+      
+      loadingSystem.finishLoading();
+      
+      // Enable start button when everything is loaded
+      if (startButton) {
+        startButton.disabled = false;
+        startButton.style.opacity = '1';
+        startButton.style.cursor = 'pointer';
+        startButton.style.pointerEvents = 'auto';
+      }
+    } catch (error) {
+      console.error('Error loading resources:', error);
+      loadingSystem.finishLoading();
+      // Still enable the button even if there's an error
+      if (startButton) {
+        startButton.disabled = false;
+        startButton.style.opacity = '1';
+        startButton.style.cursor = 'pointer';
+        startButton.style.pointerEvents = 'auto';
+      }
     }
-  });
+  };
   
-  const handleStartGame = async () => {
+  // Start loading immediately
+  loadAllResources();
+  
+  const handleStartGame = () => {
     if (loadingSystem.isLoading || startButton.disabled) {
+      return;
+    }
+    
+    if (!gameState.playerReady || !gameState.levelLoaded) {
+      console.error('Game resources not loaded yet');
       return;
     }
     
@@ -2013,18 +2081,8 @@ function initGame() {
     startScreen.style.display = 'none';
     
     try {
-      postProcessingSystem.init();
-      playerSystem.loadPlayerModel();
-      controlSystem.init();
-      levelSystem.load();
-      THREE.RectAreaLightUniformsLib.init();
-      
-      loadingSystem.loadDeferredResources();
-      
-      gameState.gameStarted = true;
-      
-      await audioSystem.init();
       roomSystem.init();
+      gameState.gameStarted = true;
       
       const initialMusicZone = 'room';
       if (audioSystem.ambientMusic.tracks[initialMusicZone]) {
@@ -2039,12 +2097,7 @@ function initGame() {
       }, SETTINGS.startPhone.startRingingDelay);
       
     } catch (error) {
-      if (startButton) {
-        startButton.disabled = false;
-        startButton.style.opacity = '1';
-        startButton.style.cursor = 'pointer';
-        startButton.style.pointerEvents = 'auto';
-      }
+      console.error('Error starting game:', error);
     }
   };
   
