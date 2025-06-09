@@ -510,7 +510,11 @@ const audioSystem = {
           
           this.idleTimer = setTimeout(() => {
             if (this.isIdle) {
-              animationSystem.playRandomIdleAnimation();
+              if (this.activeSoundObject.object.userData.id === 0) {
+                animationSystem.playLookingAnimation();
+              } else {
+                animationSystem.playRandomIdleAnimation();
+              }
             }
             this.isIdle = false;
             this.idleTimer = null;
@@ -695,6 +699,13 @@ const animationSystem = {
     const randomIndex = Math.floor(Math.random() * this.idleAnimations.length);
     const randomAnimation = this.idleAnimations[randomIndex];
     this.playAnimation(randomAnimation, true);
+  },
+
+  playLookingAnimation: function() {
+    if (this.isPlayingIdleAnimation || this.isRunning) {
+      return;
+    }
+    this.playAnimation("Looking", true);
   }
 };
 
