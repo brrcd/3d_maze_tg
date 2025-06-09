@@ -514,7 +514,7 @@ const audioSystem = {
             }
             this.isIdle = false;
             this.idleTimer = null;
-          }, 1000);
+          }, 2000);
         }
       } else {
         if (this.isIdle) {
