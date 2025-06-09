@@ -218,6 +218,10 @@ const audioSystem = {
   soundObjects: [],
   activeSoundObject: null,
   currentSoundVolume: 0,
+  idleTimer: null,
+  lastPlayerPosition: null,
+  idleStartTime: null,
+  isIdle: false,
 
   init: function () {
     return new Promise((resolve) => {
@@ -373,15 +377,11 @@ const audioSystem = {
   },
 
   switchToZone: function (newZone) {
-    console.log('Switching to zone:', newZone, 'Current zone:', this.ambientMusic.currentZone);
-    
     if (this.ambientMusic.currentZone === newZone) {
-      console.log('Already in this zone, skipping switch');
       return;
     }
 
     if (this.ambientMusic.isTransitioning) {
-      console.log('Already transitioning, skipping switch');
       return;
     }
 
@@ -391,15 +391,7 @@ const audioSystem = {
     this.ambientMusic.toTrack = this.ambientMusic.tracks[newZone];
     this.ambientMusic.currentZone = newZone;
 
-    console.log('Starting music transition:', {
-      fromTrack: this.ambientMusic.fromTrack?.zone,
-      toTrack: this.ambientMusic.toTrack?.zone,
-      fromVolume: this.ambientMusic.fromTrack?.getVolume(),
-      toVolume: this.ambientMusic.toTrack?.getVolume()
-    });
-
     if (!this.ambientMusic.toTrack.isPlaying) {
-      console.log('Starting playback of new track');
       this.ambientMusic.toTrack.play();
     }
   },
@@ -419,7 +411,6 @@ const audioSystem = {
     this.ambientMusic.toTrack.setVolume(THREE.MathUtils.lerp(0, toVolume, progress));
 
     if (progress >= 1) {
-      console.log('Music transition complete');
       this.ambientMusic.isTransitioning = false;
       if (this.ambientMusic.fromTrack) {
         this.ambientMusic.fromTrack.pause();
@@ -463,8 +454,8 @@ const audioSystem = {
           sound.setVolume(0);
 
           if (!object || !object.isObject3D) {
-            console.error("Объект не существует или не является Object3D");
-            return reject("Invalid object");
+            reject("Invalid object");
+            return;
           }
 
           object.add(sound);
@@ -481,11 +472,66 @@ const audioSystem = {
         },
         undefined,
         (error) => {
-          console.error("Ошибка загрузки аудио:", error);
           reject(error);
         }
       );
     });
+  },
+
+  checkPlayerIdle: function(playerPosition) {
+    if (!this.lastPlayerPosition) {
+      this.lastPlayerPosition = playerPosition.clone();
+      return;
+    }
+
+    const distance = playerPosition.distanceTo(this.lastPlayerPosition);
+    const isMoving = distance > 0.01; // Threshold for movement detection
+
+    if (isMoving) {
+      // Player is moving, reset idle state
+      if (this.idleTimer) {
+        clearTimeout(this.idleTimer);
+        this.idleTimer = null;
+      }
+      this.isIdle = false;
+      this.idleStartTime = null;
+      // Reset to idle animation when moving
+      animationSystem.playAnimation('Idle');
+    } else if (this.activeSoundObject) {
+      const distanceToSound = playerPosition.distanceTo(this.activeSoundObject.object.position);
+      
+      if (distanceToSound <= SETTINGS.soundObjects.activationDistance) {
+        if (!this.isIdle) {
+          this.idleStartTime = Date.now();
+          this.isIdle = true;
+          
+          if (this.idleTimer) {
+            clearTimeout(this.idleTimer);
+          }
+          
+          this.idleTimer = setTimeout(() => {
+            if (this.isIdle) {
+              animationSystem.playRandomIdleAnimation();
+            }
+            this.isIdle = false;
+            this.idleTimer = null;
+          }, 1000);
+        }
+      } else {
+        if (this.isIdle) {
+          if (this.idleTimer) {
+            clearTimeout(this.idleTimer);
+            this.idleTimer = null;
+          }
+          this.isIdle = false;
+          this.idleStartTime = null;
+          // Reset to idle animation when moving away from sound object
+          animationSystem.playAnimation('Idle');
+        }
+      }
+    }
+
+    this.lastPlayerPosition = playerPosition.clone();
   },
 
   updateSoundObjects: function (playerPosition) {
@@ -507,6 +553,9 @@ const audioSystem = {
         closestObject = soundObj;
       }
     });
+
+    // Add idle check
+    this.checkPlayerIdle(playerPosition);
 
     if (closestObject) {
       if (closestDistance <= SETTINGS.soundObjects.fullVolumeDistance) {
@@ -586,6 +635,17 @@ const animationSystem = {
   animations: {},
   currentAction: null,
   lastAnimation: '',
+  isPlayingIdleAnimation: false,
+  isRunning: false,
+  lastAnimationChange: 0,
+  animationChangeCooldown: 650,
+  idleAnimations: [
+    'Hip_Hop_Dancing',
+    'Listening_To_Music',
+    'Looking',
+    'Rapping',
+    'Wave_Hip_Hop_Dancing'
+  ],
 
   loadAnimation: function (name, path) {
     fbxLoader.load(path, (animFbx) => {
@@ -593,9 +653,31 @@ const animationSystem = {
     });
   },
 
-  playAnimation: function (name) {
-    if (!this.animations[name] || !this.mixer) return;
-    if (this.lastAnimation === name) return;
+  playAnimation: function (name, force = false) {
+    const now = Date.now();
+    const timeSinceLastChange = now - this.lastAnimationChange;
+
+    if (!this.animations[name] || !this.mixer) {
+      return;
+    }
+
+    if (!force && this.lastAnimation === name) {
+      return;
+    }
+
+    if (!force && timeSinceLastChange < this.animationChangeCooldown) {
+      return;
+    }
+
+    if (name === 'Running') {
+      this.isRunning = true;
+      this.isPlayingIdleAnimation = false;
+    } else if (name === 'Idle') {
+      this.isRunning = false;
+    } else if (this.idleAnimations.includes(name)) {
+      this.isPlayingIdleAnimation = true;
+      this.isRunning = false;
+    }
 
     if (this.currentAction) {
       this.currentAction.fadeOut(0.2);
@@ -605,10 +687,21 @@ const animationSystem = {
     this.currentAction.reset()
       .setEffectiveTimeScale(1)
       .setEffectiveWeight(1)
-      .fadeIn(0.2)
+      // .fadeIn(0.2)
       .play();
 
     this.lastAnimation = name;
+    this.lastAnimationChange = now;
+  },
+
+  playRandomIdleAnimation: function() {
+    if (this.isPlayingIdleAnimation || this.isRunning) {
+      return;
+    }
+    
+    const randomIndex = Math.floor(Math.random() * this.idleAnimations.length);
+    const randomAnimation = this.idleAnimations[randomIndex];
+    this.playAnimation(randomAnimation, true);
   }
 };
 
@@ -694,6 +787,7 @@ const playerSystem = {
   cameraTargetPosition: new THREE.Vector3(),
   currentCameraDistance: SETTINGS.cameraDistance,
   currentInteractable: null,
+  isMoving: false,
 
   createFallbackPlayer: function () {
     this.player = new THREE.Mesh(
@@ -726,24 +820,25 @@ const playerSystem = {
         gameState.playerReady = true;
         animationSystem.mixer = new THREE.AnimationMixer(this.player);
 
+        // Загружаем все анимации
         animationSystem.loadAnimation('Running', 'assets/models/animations/Running.fbx');
         animationSystem.loadAnimation('Idle', 'assets/models/animations/Idle.fbx');
-
         animationSystem.loadAnimation('Hip_Hop_Dancing', 'assets/models/animations/Hip_Hop_Dancing.fbx');
         animationSystem.loadAnimation('Listening_To_Music', 'assets/models/animations/Listening_To_Music.fbx');
         animationSystem.loadAnimation('Looking', 'assets/models/animations/Looking.fbx');
         animationSystem.loadAnimation('Rapping', 'assets/models/animations/Rapping.fbx');
         animationSystem.loadAnimation('Wave_Hip_Hop_Dancing', 'assets/models/animations/Wave_Hip_Hop_Dancing.fbx');
 
-        if (fbx.animations && fbx.animations.length > 0) {
-          const action = animationSystem.mixer.clipAction(fbx.animations[0]);
-          action.play();
-          action.setLoop(THREE.LoopRepeat);
-        }
+        // Ждем загрузки Idle анимации и запускаем её
+        const checkIdleAnimation = setInterval(() => {
+          if (animationSystem.animations['Idle']) {
+            clearInterval(checkIdleAnimation);
+            animationSystem.playAnimation('Idle', true);
+          }
+        }, 100);
       },
       undefined,
       (error) => {
-        console.error('Error loading FBX:', error);
         this.createFallbackPlayer();
       }
     );
@@ -806,19 +901,59 @@ const playerSystem = {
     cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraDirection).normalize();
 
     const moveVector = new THREE.Vector3();
+    let shouldMove = false;
 
-    if (keyboardState.KeyW) moveVector.add(cameraDirection);
-    if (keyboardState.KeyS) moveVector.sub(cameraDirection);
-    if (keyboardState.KeyA) moveVector.add(cameraRight);
-    if (keyboardState.KeyD) moveVector.sub(cameraRight);
+    const keyStates = {
+      W: keyboardState.KeyW,
+      S: keyboardState.KeyS,
+      A: keyboardState.KeyA,
+      D: keyboardState.KeyD
+    };
+
+    if (keyStates.W) { 
+      moveVector.add(cameraDirection); 
+      shouldMove = true;
+    }
+    if (keyStates.S) { 
+      moveVector.sub(cameraDirection); 
+      shouldMove = true;
+    }
+    if (keyStates.A) { 
+      moveVector.add(cameraRight); 
+      shouldMove = true;
+    }
+    if (keyStates.D) { 
+      moveVector.sub(cameraRight); 
+      shouldMove = true;
+    }
 
     if (joystickData.left.active) {
       moveVector.add(cameraDirection.clone().multiplyScalar(joystickData.left.y));
       moveVector.add(cameraRight.clone().multiplyScalar(-joystickData.left.x));
+      shouldMove = true;
     }
 
     if (moveVector.length() > 0) {
       moveVector.normalize().multiplyScalar(SETTINGS.movementSpeed);
+    }
+
+    if (shouldMove !== this.isMoving) {
+      this.isMoving = shouldMove;
+      
+      if (shouldMove) {
+        animationSystem.playAnimation('Running', true);
+      } else {
+        animationSystem.playAnimation('Idle', true);
+      }
+    } else if (this.isMoving && animationSystem.lastAnimation !== 'Running') {
+      animationSystem.playAnimation('Running', true);
+    } else if (!this.isMoving && animationSystem.lastAnimation !== 'Idle' && !animationSystem.isPlayingIdleAnimation) {
+      animationSystem.playAnimation('Idle', true);
+    }
+
+    if (this.isMoving && Date.now() - audioSystem.lastStepTime > 330) {
+      audioSystem.lastStepTime = Date.now();
+      audioSystem.playRandomStepSound();
     }
 
     if (moveVector.length() > 0) {
@@ -857,15 +992,6 @@ const playerSystem = {
       if (moveVector.length() > 0.01) {
         this.player.rotation.y = Math.atan2(moveVector.x, moveVector.z);
       }
-
-      animationSystem.playAnimation('Running');
-      if (Date.now() - audioSystem.lastStepTime > 330) {
-        audioSystem.lastStepTime = Date.now();
-        audioSystem.playRandomStepSound();
-      }
-    } else {
-      animationSystem.playAnimation('Idle');
-      audioSystem.lastStepTime = 0;
     }
 
     if (joystickData.right.active) {
@@ -917,7 +1043,6 @@ const playerSystem = {
   toggleDoor: function (door) {
     if (door.userData.isAnimating) return;
     if (!door.geometry || !door.geometry.boundingBox) {
-      console.error('Door geometry or boundingBox is not available');
       return;
     }
     
@@ -1222,7 +1347,6 @@ const controlSystem = {
         } else {
           collisionSystem.removeCollisionHelpers();
         }
-        console.log('Collision debug:', gameState.showCollisionDebug ? 'ON' : 'OFF');
       }
     });
 
@@ -1531,12 +1655,6 @@ const roomSystem = {
       playerPosition.clone().sub(playerSize),
       playerPosition.clone().add(playerSize)
     );
-
-    if (gameState.showCollisionDebug) {
-      const playerHelper = new THREE.Box3Helper(playerBox, 0xff0000);
-      scene.add(playerHelper);
-      setTimeout(() => scene.remove(playerHelper), 100);
-    }
 
     let newRoomId = null;
     let closestRoom = null;
