@@ -27,7 +27,8 @@ const SETTINGS = {
         "прекрати тут сидеть, выходи встречать гостей!"
       ],
       typingSpeed: 50,
-      phraseDelay: 2000
+      phraseDelay: 2000,
+      canBeViewedMultipleTimes: true
     },
     picturePhone: {
       id: 1,
@@ -37,7 +38,8 @@ const SETTINGS = {
         "дождись его у двери. и не вздумай гулять по его комнатам, ты же знаешь, что он этого не любит!"
       ],
       typingSpeed: 50,
-      phraseDelay: 2000
+      phraseDelay: 2000,
+      canBeViewedMultipleTimes: false
     },
     forestPhone: {
       id: 2,
@@ -47,7 +49,8 @@ const SETTINGS = {
         "кстати, как тебе земляника?"
       ],
       typingSpeed: 50,
-      phraseDelay: 2000
+      phraseDelay: 2000,
+      canBeViewedMultipleTimes: false
     }
   },
   targetFPS: 120,
@@ -2298,6 +2301,7 @@ const phoneSystem = {
   phoneSound: null,
   callTimeout: null,
   activePhones: new Map(),
+  viewedDialogs: new Set(), // Добавляем Set для отслеживания просмотренных диалогов
 
   init: function () {
     this.loadPhoneSound();
@@ -2375,7 +2379,7 @@ const phoneSystem = {
     const phoneData = this.activePhones.get(phoneObject);
     if (!phoneData) return;
 
-    // Only handle ringing for starting phone
+    // Обрабатываем звонок только для начального телефона
     if (phoneData.id === 0) {
       if (phoneData.sound && phoneData.sound.isPlaying) {
         phoneData.sound.stop();
@@ -2384,7 +2388,10 @@ const phoneSystem = {
       phoneObject.userData.isRinging = false;
     }
 
-    // Start dialog for all phones
+    // Добавляем диалог в просмотренные
+    this.viewedDialogs.add(phoneData.id);
+
+    // Запускаем диалог
     phoneDialogSystem.startDialog(phoneData.id);
   },
 
@@ -2392,8 +2399,14 @@ const phoneSystem = {
     const phoneData = this.activePhones.get(phoneObject);
     if (!phoneData) return;
 
-    // For starting phone, only handle interaction if it's ringing
+    // Для начального телефона обрабатываем только если он звонит
     if (phoneData.id === 0 && !phoneObject.userData.isRinging) return;
+
+    // Проверяем, можно ли просматривать диалог повторно
+    const phoneCall = Object.values(SETTINGS.phoneCalls).find(call => call.id === phoneData.id);
+    if (!phoneCall.canBeViewedMultipleTimes && this.viewedDialogs.has(phoneData.id)) {
+      return; // Пропускаем если диалог уже был просмотрен
+    }
 
     this.stopCall(phoneObject);
   }
