@@ -18,6 +18,38 @@ const SETTINGS = {
     ringingVolume: 0.8,
     startRingingDelay: 10000
   },
+  phoneCalls: {
+    startPhone: {
+      id: 0,
+      phrases: [
+        "эй, ты снова тут? хе-хе, спешу тебя предупредить, он уже едет",
+        "мы пересеклись с ним в поезде, в вагоне №4, хе-хе",
+        "прекрати тут сидеть, выходи встречать гостей!"
+      ],
+      typingSpeed: 50,
+      phraseDelay: 2000
+    },
+    picturePhone: {
+      id: 1,
+      phrases: [
+        "это снова я тебе звоню, узнал? хе-хе, ну ты как там? не скучаешь?",
+        "я только что видел его в кафе неподалеку. вроде бы он меня не узнал, хе-хе",
+        "дождись его у двери. и не вздумай гулять по его комнатам, ты же знаешь, что он этого не любит!"
+      ],
+      typingSpeed: 50,
+      phraseDelay: 2000
+    },
+    forestPhone: {
+      id: 2,
+      phrases: [
+        "ну в кого ты такой? почему с тобой всегда так сложно? хе-хе",
+        "просто жди его у двери, я же сказал, он сейчас подойдет. просто жди и всё...",
+        "кстати, как тебе земляника?"
+      ],
+      typingSpeed: 50,
+      phraseDelay: 2000
+    }
+  },
   targetFPS: 120,
   ambientMusic: {
     room: {
@@ -1059,8 +1091,8 @@ const playerSystem = {
 
     if (this.currentInteractable.userData.isDoor) {
       this.toggleDoor(this.currentInteractable);
-    } else if (this.currentInteractable.userData.isRinging) {
-      phoneSystem.stopCall();
+    } else if (this.currentInteractable.userData.isPhone) {
+      phoneSystem.handlePhoneInteraction(this.currentInteractable);
     }
   },
 
@@ -1283,7 +1315,6 @@ const postProcessingSystem = {
 
   init: function () {
     if (this.isInitialized) return;
-  
 
     try {
       const renderTarget = new THREE.WebGLRenderTarget(
@@ -1682,6 +1713,22 @@ const levelSystem = {
     gltfLoader.load('assets/levels/level_2.glb', 
       (gltf) => {
         scene.add(gltf.scene);
+
+        // Add phone properties to phone objects
+        gltf.scene.traverse(child => {
+          if (child.name.toLowerCase().includes('phone')) {
+            child.userData.isPhone = true;
+            if (child.name === 'rotary_phoneglb') {
+              child.userData.phoneId = 0; // Starting phone
+            } else if (child.name === 'rotary_phoneglb001') {
+              child.userData.phoneId = 1; // Picture phone
+            } else {
+              child.userData.phoneId = 2; // Forest phone
+            }
+            child.userData.isInteractable = true;
+            interactableObjects.push(child);
+          }
+        });
 
         gltf.scene.traverse(child => {
           if (child.isMesh && child.userData?.isFloor && child.userData.floorId !== undefined) {
@@ -2083,8 +2130,9 @@ function initGame() {
           audioSystem.ambientMusic.currentZone = initialMusicZone;
         }
 
+        // Start the initial phone call after a delay
         setTimeout(() => {
-          phoneSystem.startCall();
+          phoneSystem.startCall(0); // Start phone with ID 0
         }, SETTINGS.startPhone.startRingingDelay);
         
       } catch (error) {
@@ -2249,10 +2297,14 @@ const phoneSystem = {
   phoneObject: null,
   phoneSound: null,
   callTimeout: null,
+  activePhones: new Map(),
+
   init: function () {
     this.loadPhoneSound();
-    this.findPhoneObject();
+    this.findPhoneObjects();
+    phoneDialogSystem.init();
   },
+
   loadPhoneSound: function () {
     const phoneAudio = new THREE.Audio(audioListener);
     audioLoader.load('assets/audio/phone/phone.mp3', (buffer) => {
@@ -2262,36 +2314,237 @@ const phoneSystem = {
       this.phoneSound = phoneAudio;
     });
   },
-  findPhoneObject: function () {
-    let found = false;
+
+  findPhoneObjects: function () {
     scene.traverse((child) => {
-      if (child.userData.isStartingPhone) {
-        this.phoneObject = child;
+      if (child.name.toLowerCase().includes('phone')) {
+        if (!child.userData.isPhone) {
+          child.userData.isPhone = true;
+          if (child.name === 'rotary_phoneglb') {
+            child.userData.phoneId = 0;
+          } else if (child.name === 'rotary_phoneglb001') {
+            child.userData.phoneId = 1;
+          } else {
+            child.userData.phoneId = 2;
+          }
+        }
+        
+        // Only add sound and ringing state for the starting phone (ID 0)
+        const phoneData = {
+          id: child.userData.phoneId,
+          isRinging: false,
+          sound: child.userData.phoneId === 0 ? null : undefined // Only create sound for starting phone
+        };
+        
+        this.activePhones.set(child, phoneData);
         child.userData.isInteractable = true;
         interactableObjects.push(child);
-        found = true;
       }
     });
-    if (!found) {
-      console.warn('Phone object not found in scene!');
-    }
   },
-  startCall: function () {
+
+  startCall: function (phoneId) {
     if (!gameState.gameStarted) return;
-    if (this.phoneSound && !this.phoneSound.isPlaying) {
-      this.phoneSound.play();
-      if (this.phoneObject) {
-        this.phoneObject.userData.isRinging = true;
+    if (phoneId !== 0) return; // Only allow starting phone to ring
+
+    const phoneObject = Array.from(this.activePhones.keys())
+      .find(phone => phone.userData.phoneId === phoneId);
+
+    if (!phoneObject) return;
+
+    const phoneData = this.activePhones.get(phoneObject);
+    if (phoneData.isRinging) return;
+
+    if (!phoneData.sound) {
+      phoneData.sound = new THREE.Audio(audioListener);
+      audioLoader.load('assets/audio/phone/phone.mp3', (buffer) => {
+        phoneData.sound.setBuffer(buffer);
+        phoneData.sound.setVolume(SETTINGS.startPhone.ringingVolume);
+        phoneData.sound.setLoop(true);
+        phoneData.sound.play();
+      });
+    } else {
+      phoneData.sound.play();
+    }
+
+    phoneData.isRinging = true;
+    phoneObject.userData.isRinging = true;
+  },
+
+  stopCall: function (phoneObject) {
+    const phoneData = this.activePhones.get(phoneObject);
+    if (!phoneData) return;
+
+    // Only handle ringing for starting phone
+    if (phoneData.id === 0) {
+      if (phoneData.sound && phoneData.sound.isPlaying) {
+        phoneData.sound.stop();
+      }
+      phoneData.isRinging = false;
+      phoneObject.userData.isRinging = false;
+    }
+
+    // Start dialog for all phones
+    phoneDialogSystem.startDialog(phoneData.id);
+  },
+
+  handlePhoneInteraction: function (phoneObject) {
+    const phoneData = this.activePhones.get(phoneObject);
+    if (!phoneData) return;
+
+    // For starting phone, only handle interaction if it's ringing
+    if (phoneData.id === 0 && !phoneObject.userData.isRinging) return;
+
+    this.stopCall(phoneObject);
+  }
+};
+
+const phoneDialogSystem = {
+  currentPhoneId: null,
+  currentPhraseIndex: 0,
+  typingInterval: null,
+  isTyping: false,
+  dialogElement: null,
+  isDialogActive: false,
+
+  init: function() {
+    this.createDialogElement();
+  },
+
+  createDialogElement: function() {
+    this.dialogElement = document.createElement('div');
+    this.dialogElement.id = 'phone-dialog';
+    this.dialogElement.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      display: none;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    `;
+
+    const textElement = document.createElement('div');
+    textElement.id = 'phone-dialog-text';
+    textElement.style.cssText = `
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: orange;
+      font-family: 'Courier New', monospace;
+      font-size: 24px;
+      text-align: center;
+      width: 80%;
+    `;
+
+    this.dialogElement.appendChild(textElement);
+    document.body.appendChild(this.dialogElement);
+
+    this.dialogElement.addEventListener('click', () => this.skipToNextPhrase());
+    this.dialogElement.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.skipToNextPhrase();
+    });
+  },
+
+  startDialog: function(phoneId) {
+    if (this.isDialogActive) return;
+
+    const phoneCall = Object.values(SETTINGS.phoneCalls).find(call => call.id === phoneId);
+    if (!phoneCall) return;
+
+    this.currentPhoneId = phoneId;
+    this.currentPhraseIndex = 0;
+    this.isDialogActive = true;
+
+    // Pause game
+    gameState.gameStarted = false;
+
+    // Show dialog
+    this.dialogElement.style.display = 'block';
+    requestAnimationFrame(() => {
+      this.dialogElement.style.opacity = '1';
+    });
+
+    this.startTyping();
+  },
+
+  startTyping: function() {
+    const textElement = document.getElementById('phone-dialog-text');
+    const phoneCall = Object.values(SETTINGS.phoneCalls).find(call => call.id === this.currentPhoneId);
+
+    if (this.currentPhraseIndex >= phoneCall.phrases.length) {
+      this.endDialog();
+      return;
+    }
+
+    this.isTyping = true;
+    const phrase = phoneCall.phrases[this.currentPhraseIndex];
+    let charIndex = 0;
+
+    textElement.textContent = '';
+
+    this.typingInterval = setInterval(() => {
+      textElement.textContent += phrase[charIndex];
+      charIndex++;
+
+      if (charIndex >= phrase.length) {
+        clearInterval(this.typingInterval);
+        this.isTyping = false;
+
+        setTimeout(() => {
+          if (this.currentPhraseIndex < phoneCall.phrases.length - 1) {
+            textElement.textContent = '';
+            this.currentPhraseIndex++;
+            this.startTyping();
+          }
+        }, phoneCall.phraseDelay);
+      }
+    }, phoneCall.typingSpeed);
+  },
+
+  skipToNextPhrase: function() {
+    if (!this.isDialogActive) return;
+
+    if (this.isTyping) {
+      clearInterval(this.typingInterval);
+      this.isTyping = false;
+
+      const textElement = document.getElementById('phone-dialog-text');
+      const phoneCall = Object.values(SETTINGS.phoneCalls).find(call => call.id === this.currentPhoneId);
+      textElement.textContent = phoneCall.phrases[this.currentPhraseIndex];
+
+      if (this.currentPhraseIndex === phoneCall.phrases.length - 1) {
+        setTimeout(() => this.endDialog(), 300);
+      } else {
+        setTimeout(() => {
+          textElement.textContent = '';
+          this.currentPhraseIndex++;
+          this.startTyping();
+        }, 300);
       }
     }
   },
-  stopCall: function () {
-    if (this.phoneSound && this.phoneSound.isPlaying) {
-      this.phoneSound.stop();
-      if (this.phoneObject) {
-        this.phoneObject.userData.isRinging = false;
-      }
-    }
+
+  endDialog: function() {
+    if (!this.isDialogActive) return;
+
+    this.isDialogActive = false;
+    this.currentPhoneId = null;
+    this.currentPhraseIndex = 0;
+
+    // Hide dialog with fade
+    this.dialogElement.style.opacity = '0';
+    setTimeout(() => {
+      this.dialogElement.style.display = 'none';
+    }, 300);
+
+    // Resume game
+    gameState.gameStarted = true;
   }
 };
 
