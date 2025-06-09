@@ -1,5 +1,5 @@
 const SETTINGS = {
-  movementSpeed: 0.1,
+  movementSpeed: 0.15,
   rotationSpeed: 0.03,
   cameraDistance: 5,
   cameraHeight: 3,
@@ -9,7 +9,7 @@ const SETTINGS = {
   musicVolume: 0.001,
   introPhrases: [
     "срочно, включи звук на своём устройстве, это важно. тут будут происходить малообъяснимые вещи, постарайся в этом не заблудиться. пожалуйста, будь внимательным и предсказуемым, ничего не разбей и не споткнись, иначе произойдет нечто непредвиденное.",
-    "это моя первая игра. и каждый сантиметр этой игры был сделан с любовью. тут ты сможешь расхаживать по коридорам, комнатам, улицам, любуясь картинами, и наслаждаясь новыми песнями с альбома «ЗЕМЛЯНИКА». вообщем, чувствуй себя как дома! но знай, не все двери хотят быть открытыми. и вот еще что, не поднимай трубки от незнакомых, а то это уже начинает раздражать.",
+    "это моя первая игра. и каждый сантиметр этой игры был сделан с любовью. тут ты сможешь расхаживать по коридорам, комнатам, улицам, любуясь картинами, и наслаждаясь новыми песнями с альбома «ЗЕМЛЯНИКА». в общем, чувствуй себя как дома! но знай, не все двери хотят быть открытыми. и вот еще что, не поднимай трубки от незнакомых, а то это уже начинает раздражать.",
     "давай подождем, пока этот гребаный мир прогрузится",
   ],
   typingSpeed: 50,
@@ -136,18 +136,25 @@ const SETTINGS = {
         volume: 0.3
       }
     },
-    checkInterval: 500 // Check room every 500ms
-  }
+    checkInterval: 500
+  },
+  renderer: {
+    pixelRatio: 3,
+    antialias: false,
+    powerPreference: "low-power",
+    maxFPS: 60,
+    enablePostProcessing: true
+  },
 };
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9abfbf);
 
 const renderer = new THREE.WebGLRenderer({
-  antialias: false,
-  powerPreference: "low-power"
+  antialias: SETTINGS.renderer.antialias,
+  powerPreference: SETTINGS.renderer.powerPreference
 });
-renderer.setPixelRatio(3);
+renderer.setPixelRatio(SETTINGS.renderer.pixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputEncoding = THREE.LinearEncoding;
 renderer.toneMapping = THREE.NoToneMapping;
@@ -227,34 +234,28 @@ const audioSystem = {
     return new Promise((resolve) => {
       loadingSystem.startLoading();
       
-      // Count step sounds
       for (const surfaceType in SETTINGS.stepSoundPaths) {
         SETTINGS.stepSoundPaths[surfaceType].forEach(() => {
           loadingSystem.addResource();
         });
       }
       
-      // Add door sounds
-      loadingSystem.addResource(); // For door open
-      loadingSystem.addResource(); // For door close
+      loadingSystem.addResource();
+      loadingSystem.addResource();
       
-      // Add ambient music
       SETTINGS.zones.forEach(() => {
         loadingSystem.addResource();
       });
 
       const loadPromises = [];
 
-      // Load step sounds
       for (const surfaceType in SETTINGS.stepSoundPaths) {
         this.stepSounds[surfaceType] = [];
         loadPromises.push(this.loadStepSounds(surfaceType));
       }
 
-      // Load door sounds
       loadPromises.push(this.loadDoorSounds());
 
-      // Load ambient music
       loadPromises.push(this.loadAmbientMusic());
 
       Promise.all(loadPromises).then(() => {
@@ -485,10 +486,9 @@ const audioSystem = {
     }
 
     const distance = playerPosition.distanceTo(this.lastPlayerPosition);
-    const isMoving = distance > 0.01; // Threshold for movement detection
+    const isMoving = distance > 0.01;
 
     if (isMoving) {
-      // Player is moving, reset idle state
       if (this.idleTimer) {
         clearTimeout(this.idleTimer);
         this.idleTimer = null;
@@ -524,7 +524,6 @@ const audioSystem = {
           }
           this.isIdle = false;
           this.idleStartTime = null;
-          // Reset to idle animation when moving away from sound object
           animationSystem.playAnimation('Idle');
         }
       }
@@ -553,7 +552,6 @@ const audioSystem = {
       }
     });
 
-    // Add idle check
     this.checkPlayerIdle(playerPosition);
 
     if (closestObject) {
@@ -700,50 +698,72 @@ const animationSystem = {
   }
 };
 
+const vectorPool = {
+  pool: [],
+  maxSize: 100,
+  
+  get: function() {
+    return this.pool.pop() || new THREE.Vector3();
+  },
+  
+  release: function(vector) {
+    if (this.pool.length < this.maxSize) {
+      vector.set(0, 0, 0);
+      this.pool.push(vector);
+    }
+  }
+};
+
 const collisionSystem = {
   checkCollision: function (position) {
-    if (!gameState.playerReady) return { collision: false, slideVector: new THREE.Vector3() };
-
-    const playerSize = new THREE.Vector3(0.8, 1.5, 0.8);
+    if (!gameState.playerReady) return { collision: false, slideVector: vectorPool.get() };
+    
+    const playerSize = vectorPool.get().set(0.8, 1.5, 0.8);
     const playerBox = new THREE.Box3(
-      new THREE.Vector3().copy(position).sub(playerSize),
-      new THREE.Vector3().copy(position).add(playerSize)
+      vectorPool.get().copy(position).sub(playerSize),
+      vectorPool.get().copy(position).add(playerSize)
     );
-
+    
+    vectorPool.release(playerSize);
+    
     if (gameState.showCollisionDebug) {
       const playerHelper = collisionHelpers.find(h => h.box === playerBox);
       if (playerHelper) {
         playerHelper.box.copy(playerBox);
       }
     }
-
+    
     let collision = false;
-    let slideVector = new THREE.Vector3();
-
+    const slideVector = vectorPool.get();
+    
     for (const child of collidableObjects) {
       const isClosedDoor = child.userData.isDoor && child.userData.isClosed;
-
+      
       if ((child.userData.isCollidable && !child.userData.isDoor) || isClosedDoor) {
         if (!child.box3) {
           child.box3 = new THREE.Box3().setFromObject(child);
         }
-
+        
         if (playerBox.intersectsBox(child.box3)) {
           collision = true;
-          const overlap = new THREE.Vector3();
+          const overlap = vectorPool.get();
           child.box3.getCenter(overlap).sub(position);
-
+          
           if (Math.abs(overlap.x) > Math.abs(overlap.z)) {
             overlap.z = 0;
           } else {
             overlap.x = 0;
           }
-
+          
           slideVector.add(overlap.normalize());
+          vectorPool.release(overlap);
         }
       }
     }
-
+    
+    vectorPool.release(playerBox.min);
+    vectorPool.release(playerBox.max);
+    
     return {
       collision,
       slideVector: slideVector.normalize()
@@ -815,7 +835,6 @@ const playerSystem = {
         gameState.playerReady = true;
         animationSystem.mixer = new THREE.AnimationMixer(this.player);
 
-        // Загружаем все анимации
         animationSystem.loadAnimation('Running', 'assets/models/animations/Running.fbx');
         animationSystem.loadAnimation('Idle', 'assets/models/animations/Idle.fbx');
         animationSystem.loadAnimation('Hip_Hop_Dancing', 'assets/models/animations/Hip_Hop_Dancing.fbx');
@@ -824,7 +843,6 @@ const playerSystem = {
         animationSystem.loadAnimation('Rapping', 'assets/models/animations/Rapping.fbx');
         animationSystem.loadAnimation('Wave_Hip_Hop_Dancing', 'assets/models/animations/Wave_Hip_Hop_Dancing.fbx');
 
-        // Ждем загрузки Idle анимации и запускаем её
         const checkIdleAnimation = setInterval(() => {
           if (animationSystem.animations['Idle']) {
             clearInterval(checkIdleAnimation);
@@ -1250,34 +1268,57 @@ const joystickSystem = {
 
 const postProcessingSystem = {
   composer: null,
+  isInitialized: false,
 
   init: function () {
-    const renderTarget = new THREE.WebGLRenderTarget(
-      window.innerWidth,
-      window.innerHeight,
-      {
-        minFilter: THREE.LinearFilter,
-        magFilter: THREE.NearestFilter,
-        format: THREE.RGBAFormat
-      }
-    );
+    if (this.isInitialized) return;
+    
+    if (performanceSystem.isLowEndDevice && !SETTINGS.renderer.enablePostProcessing) {
+      this.isInitialized = true;
+      return;
+    }
 
-    this.composer = new THREE.EffectComposer(renderer, renderTarget);
+    try {
+      const renderTarget = new THREE.WebGLRenderTarget(
+        window.innerWidth,
+        window.innerHeight,
+        {
+          minFilter: THREE.LinearFilter,
+          magFilter: THREE.NearestFilter,
+          format: THREE.RGBAFormat
+        }
+      );
 
-    const renderPass = new THREE.RenderPass(scene, camera);
-    this.composer.addPass(renderPass);
+      this.composer = new THREE.EffectComposer(renderer, renderTarget);
 
-    const ditherPass = new THREE.ShaderPass(DitherShader);
-    ditherPass.renderToScreen = true;
-    this.composer.addPass(ditherPass);
+      const renderPass = new THREE.RenderPass(scene, camera);
+      this.composer.addPass(renderPass);
 
-    DitherShader.uniforms.tDiffuse.value = renderTarget.texture;
-    DitherShader.uniforms.resolution.value.set(
-      window.innerWidth,
-      window.innerHeight
-    );
+      const ditherPass = new THREE.ShaderPass(DitherShader);
+      ditherPass.renderToScreen = true;
+      this.composer.addPass(ditherPass);
 
-    this.composer.render();
+      DitherShader.uniforms.tDiffuse.value = renderTarget.texture;
+      DitherShader.uniforms.resolution.value.set(
+        window.innerWidth,
+        window.innerHeight
+      );
+
+      this.composer.render();
+      this.isInitialized = true;
+    } catch (error) {
+      this.isInitialized = true;
+    }
+  },
+
+  onWindowResize: function() {
+    if (!this.isInitialized || !this.composer) return;
+    
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    
+    this.composer.setSize(width, height);
+    DitherShader.uniforms.resolution.value.set(width, height);
   }
 };
 
@@ -1368,25 +1409,76 @@ const controlSystem = {
   }
 };
 
+const resourceCache = {
+  textures: new Map(),
+  models: new Map(),
+  audio: new Map(),
+  
+  getTexture: function(path) {
+    if (this.textures.has(path)) {
+      return this.textures.get(path);
+    }
+    return null;
+  },
+  
+  setTexture: function(path, texture) {
+    this.textures.set(path, texture);
+  },
+  
+  getModel: function(path) {
+    if (this.models.has(path)) {
+      return this.models.get(path);
+    }
+    return null;
+  },
+  
+  setModel: function(path, model) {
+    this.models.set(path, model);
+  },
+  
+  getAudio: function(path) {
+    if (this.audio.has(path)) {
+      return this.audio.get(path);
+    }
+    return null;
+  },
+  
+  setAudio: function(path, audio) {
+    this.audio.set(path, audio);
+  },
+  
+  clear: function() {
+    this.textures.clear();
+    this.models.clear();
+    this.audio.clear();
+  }
+};
+
 const loadingSystem = {
   totalResources: 0,
   loadedResources: 0,
   isLoading: false,
   loadingElement: null,
-  startButton: null,
-
+  priorityResources: [],
+  deferredResources: [],
+  
   init: function() {
     this.loadingElement = document.createElement('div');
     this.loadingElement.id = 'loading-text';
     this.loadingElement.style.cssText = SETTINGS.loadingText.style;
     document.getElementById('start-screen').appendChild(this.loadingElement);
     
-    this.startButton = document.getElementById('start-button');
-    this.startButton.disabled = true;
-    this.startButton.style.opacity = '0.5';
-    this.startButton.style.cursor = 'not-allowed';
+    this.priorityResources = [
+      'assets/models/Hazmat_Character.fbx',
+      'assets/levels/level_2.glb',
+      'assets/textures/wood_floor.jpg',
+      'assets/audio/ambient/room.mp3',
+      'assets/audio/steps/step_wood_1.mp3',
+      'assets/audio/door/door_open.mp3',
+      'assets/audio/door/door_close.mp3'
+    ];
   },
-
+  
   startLoading: function() {
     this.isLoading = true;
     this.loadedResources = 0;
@@ -1394,12 +1486,12 @@ const loadingSystem = {
     this.loadingElement.style.opacity = '1';
     this.updateLoadingText();
   },
-
+  
   addResource: function() {
     this.totalResources++;
     this.updateLoadingText();
   },
-
+  
   resourceLoaded: function() {
     this.loadedResources++;
     this.updateLoadingText();
@@ -1408,20 +1500,142 @@ const loadingSystem = {
       this.finishLoading();
     }
   },
-
+  
   updateLoadingText: function() {
     const percentage = this.totalResources > 0 
       ? Math.round((this.loadedResources / this.totalResources) * 100) 
       : 0;
     this.loadingElement.textContent = `Загрузка: ${percentage}%`;
   },
-
+  
   finishLoading: function() {
     this.isLoading = false;
     this.loadingElement.style.opacity = '0';
-    this.startButton.disabled = false;
-    this.startButton.style.opacity = '1';
-    this.startButton.style.cursor = 'pointer';
+    
+    const startButton = document.getElementById('start-button');
+    if (startButton) {
+      startButton.disabled = false;
+      startButton.style.opacity = '1';
+      startButton.style.cursor = 'pointer';
+      startButton.style.pointerEvents = 'auto';
+    }
+  },
+  
+  loadPriorityResources: function() {
+    return new Promise((resolve) => {
+      if (this.priorityResources.length === 0) {
+        this.finishLoading();
+        resolve();
+        return;
+      }
+
+      this.startLoading();
+      
+      const loadPromises = this.priorityResources.map(resource => {
+        return new Promise((resolveResource) => {
+          this.addResource();
+          this.loadResource(resource, () => {
+            this.resourceLoaded();
+            resolveResource();
+          });
+        });
+      });
+      
+      Promise.all(loadPromises).then(resolve);
+    });
+  },
+  
+  loadDeferredResources: function() {
+    this.deferredResources.forEach(resource => {
+      this.addResource();
+      this.loadResource(resource, () => {
+        this.resourceLoaded();
+      });
+    });
+  },
+  
+  loadResource: function(path, callback) {
+    const extension = path.split('.').pop().toLowerCase();
+    
+    switch(extension) {
+      case 'jpg':
+      case 'png':
+        this.loadTexture(path, callback);
+        break;
+      case 'mp3':
+        this.loadAudio(path, callback);
+        break;
+      case 'fbx':
+      case 'glb':
+        this.loadModel(path, callback);
+        break;
+      default:
+        this.resourceLoaded();
+        callback();
+    }
+  },
+  
+  loadTexture: function(path, callback) {
+    const cached = resourceCache.getTexture(path);
+    if (cached) {
+      callback(cached);
+      return;
+    }
+    
+    textureLoader.load(path,
+      (texture) => {
+        resourceCache.setTexture(path, texture);
+        callback(texture);
+      },
+      undefined,
+      () => {
+        this.resourceLoaded();
+        callback();
+      }
+    );
+  },
+  
+  loadAudio: function(path, callback) {
+    const cached = resourceCache.getAudio(path);
+    if (cached) {
+      callback(cached);
+      return;
+    }
+    
+    audioLoader.load(path,
+      (buffer) => {
+        const audio = new THREE.Audio(audioListener);
+        audio.setBuffer(buffer);
+        resourceCache.setAudio(path, audio);
+        callback(audio);
+      },
+      undefined,
+      () => {
+        this.resourceLoaded();
+        callback();
+      }
+    );
+  },
+  
+  loadModel: function(path, callback) {
+    const cached = resourceCache.getModel(path);
+    if (cached) {
+      callback(cached);
+      return;
+    }
+    
+    const loader = path.endsWith('.fbx') ? fbxLoader : gltfLoader;
+    loader.load(path,
+      (model) => {
+        resourceCache.setModel(path, model);
+        callback(model);
+      },
+      undefined,
+      () => {
+        this.resourceLoaded();
+        callback();
+      }
+    );
   }
 };
 
@@ -1430,7 +1644,7 @@ const levelSystem = {
     if (gameState.levelLoaded) return;
     
     loadingSystem.startLoading();
-    loadingSystem.addResource(); // For level model
+    loadingSystem.addResource();
 
     const textures = [
       textureLoader.load('assets/textures/wood_floor.jpg', 
@@ -1444,8 +1658,8 @@ const levelSystem = {
         () => loadingSystem.resourceLoaded()
       )
     ];
-    loadingSystem.addResource(); // For wood floor texture
-    loadingSystem.addResource(); // For grass floor texture
+    loadingSystem.addResource();
+    loadingSystem.addResource();
 
     textures.forEach(t => {
       t.wrapS = THREE.RepeatWrapping;
@@ -1753,26 +1967,62 @@ const roomSystem = {
   }
 };
 
+const performanceSystem = {
+  isLowEndDevice: false,
+  
+  init: function() {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const hasLowMemory = navigator.deviceMemory && navigator.deviceMemory < 4;
+    const hasLowCores = navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4;
+    
+    this.isLowEndDevice = isMobile || hasLowMemory || hasLowCores;
+    
+    if (this.isLowEndDevice) {
+      SETTINGS.renderer.pixelRatio = 1;
+      SETTINGS.renderer.maxFPS = 30;
+      SETTINGS.renderer.enablePostProcessing = false;
+      SETTINGS.ditherPixelSize = 4;
+    }
+  }
+};
+
 function initGame() {
-  postProcessingSystem.init();
-  playerSystem.loadPlayerModel();
-  controlSystem.init();
+  performanceSystem.init();
+  
   introSystem.init();
   loadingSystem.init();
-  levelSystem.load();
-  THREE.RectAreaLightUniformsLib.init();
-
+  
   const startScreen = document.getElementById('start-screen');
   const startButton = document.getElementById('start-button');
-
+  
+  loadingSystem.loadPriorityResources().catch(() => {
+    if (startButton) {
+      startButton.disabled = false;
+      startButton.style.opacity = '1';
+      startButton.style.cursor = 'pointer';
+      startButton.style.pointerEvents = 'auto';
+    }
+  });
+  
   const handleStartGame = async () => {
-    if (loadingSystem.isLoading) return;
+    if (loadingSystem.isLoading || startButton.disabled) {
+      return;
+    }
     
     resumeAudioContext();
     startScreen.style.display = 'none';
-    gameState.gameStarted = true;
-
+    
     try {
+      postProcessingSystem.init();
+      playerSystem.loadPlayerModel();
+      controlSystem.init();
+      levelSystem.load();
+      THREE.RectAreaLightUniformsLib.init();
+      
+      loadingSystem.loadDeferredResources();
+      
+      gameState.gameStarted = true;
+      
       await audioSystem.init();
       roomSystem.init();
       
@@ -1787,11 +2037,17 @@ function initGame() {
       setTimeout(() => {
         phoneSystem.startCall();
       }, SETTINGS.startPhone.startRingingDelay);
+      
     } catch (error) {
-      console.error('Error during game initialization:', error);
+      if (startButton) {
+        startButton.disabled = false;
+        startButton.style.opacity = '1';
+        startButton.style.cursor = 'pointer';
+        startButton.style.pointerEvents = 'auto';
+      }
     }
   };
-
+  
   startButton.addEventListener('click', handleStartGame);
   startButton.addEventListener('touchstart', (e) => {
     e.preventDefault();
@@ -1800,7 +2056,7 @@ function initGame() {
 }
 
 let lastFrameTime = 0;
-const frameTime = 1000 / SETTINGS.targetFPS;
+const frameTime = 1000 / SETTINGS.renderer.maxFPS;
 
 function gameLoop(currentTime) {
   requestAnimationFrame(gameLoop);
@@ -1829,7 +2085,11 @@ function gameLoop(currentTime) {
 
   audioSystem.updateMusicTransition();
 
-  postProcessingSystem.composer.render();
+  if (postProcessingSystem.composer) {
+    postProcessingSystem.composer.render();
+  } else {
+    renderer.render(scene, camera);
+  }
 }
 
 const introSystem = {
@@ -1859,12 +2119,15 @@ const introSystem = {
         padding: 10px 20px;
         font-size: 18px;
         display: none;
-        cursor: pointer;
+        cursor: not-allowed;
         background: rgba(255,255,255,0.2);
         color: orange;
         border: 1px solid white;
         border-radius: 5px;
-        transition: opacity 0.3s ease;
+        transition: all 0.3s ease;
+        opacity: 0.5;
+        pointer-events: none;
+        user-select: none;
       ">НАЧАТЬ ДЕНЬ</button>
     `;
 
@@ -1997,3 +2260,14 @@ function resumeAudioContext() {
     ctx.resume();
   }
 }
+
+window.addEventListener('resize', () => {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+  
+  renderer.setSize(width, height);
+  postProcessingSystem.onWindowResize();
+});
