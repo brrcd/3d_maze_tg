@@ -1,5 +1,5 @@
 const SETTINGS = {
-  movementSpeed: 0.17,
+  movementSpeed: 0.19,
   rotationSpeed: 0.03,
   cameraDistance: 5,
   cameraHeight: 3,
@@ -862,7 +862,7 @@ const playerSystem = {
 
   loadPlayerModel: function () {
     fbxLoader.load(
-      'assets/models/Hazmat_Character.fbx',
+      'assets/models/character.fbx',
       (fbx) => {
         this.player = fbx;
         this.player.name = 'player';
