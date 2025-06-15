@@ -2,7 +2,7 @@ const SETTINGS = {
   movementSpeed: 0.19,
   rotationSpeed: 0.03,
   cameraDistance: 5,
-  cameraHeight: 3,
+  cameraHeight: 4,
   interactionDistance: 3,
   ditherPixelSize: 3,
   doorSoundVolume: 0.5,
@@ -945,7 +945,7 @@ const playerSystem = {
       0.2
     );
 
-    camera.lookAt(this.player.position.x, this.player.position.y + 1, this.player.position.z);
+    camera.lookAt(this.player.position.x, this.player.position.y + 1.5, this.player.position.z);
   },
 
   handleMovement: function () {
