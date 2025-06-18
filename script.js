@@ -475,6 +475,8 @@ const audioSystem = {
         break;
       case 8: soundPath = "assets/audio/music/picture_9.mp3";
         break;
+      case 9: soundPath = "assets/audio/music/picture_10.mp3";
+        break;
       default: soundPath = "assets/audio/music/picture_1.mp3";
         break;
     }
@@ -1703,7 +1705,12 @@ const levelSystem = {
         () => loadingSystem.resourceLoaded(),
         undefined,
         () => loadingSystem.resourceLoaded()
-      )
+      ),
+      textureLoader.load('assets/textures/tile_14.png',
+        () => loadingSystem.resourceLoaded(),
+        undefined,
+        () => loadingSystem.resourceLoaded()
+      ),
     ];
     loadingSystem.addResource();
     loadingSystem.addResource();
