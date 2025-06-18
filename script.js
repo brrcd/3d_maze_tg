@@ -206,11 +206,11 @@ const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerH
 camera.add(audioListener);
 
 scene.add(new THREE.AmbientLight(0xFFFFFF, 1));
-const debugSphere = new THREE.Mesh(
-  new THREE.SphereGeometry(0.5),
-  new THREE.MeshBasicMaterial({ color: 0xff0000 })
-);
-scene.add(debugSphere);
+// const debugSphere = new THREE.Mesh(
+//   new THREE.SphereGeometry(0.5),
+//   new THREE.MeshBasicMaterial({ color: 0xff0000 })
+// );
+// scene.add(debugSphere);
 
 const gameState = {
   playerReady: false,
@@ -2182,12 +2182,12 @@ function gameLoop(currentTime) {
     playerSystem.checkInteractableProximity();
     audioSystem.updateSoundObjects(playerSystem.player.position);
   }
-  if (audioSystem.activeSoundObject) {
-    debugSphere.position.copy(audioSystem.activeSoundObject.object.position);
-    debugSphere.visible = true;
-  } else {
-    debugSphere.visible = false;
-  }
+  // if (audioSystem.activeSoundObject) {
+  //   debugSphere.position.copy(audioSystem.activeSoundObject.object.position);
+  //   debugSphere.visible = true;
+  // } else {
+  //   debugSphere.visible = false;
+  // }
 
   audioSystem.updateMusicTransition();
 
