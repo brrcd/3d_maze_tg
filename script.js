@@ -217,7 +217,7 @@ const gameState = {
   levelLoaded: false,
   showCollisionDebug: false,
   gameStarted: false,
-  startPhonePickedUp: false // Добавлен флаг для отслеживания поднятия трубки стартового телефона
+  startPhonePickedUp: false
 };
 
 const keyboardState = {
@@ -500,6 +500,19 @@ const audioSystem = {
           object.add(sound);
           object.userData.soundVolume = SETTINGS.soundObjects.maxVolume;
 
+          let activationDistance = SETTINGS.soundObjects.activationDistance;
+          let deactivationDistance = SETTINGS.soundObjects.deactivationDistance;
+          if (id >= 1 && id <= 5) {
+            activationDistance = 8;
+            deactivationDistance = 10;
+          } else if (id > 5) {
+            activationDistance = 14;
+            deactivationDistance = 16;
+          }
+          object.userData.activationDistance = activationDistance;
+          object.userData.deactivationDistance = deactivationDistance;
+          object.userData.id = id;
+
           const soundObj = {
             object: object,
             sound: sound,
@@ -537,7 +550,8 @@ const audioSystem = {
     } else if (this.activeSoundObject) {
       const distanceToSound = playerPosition.distanceTo(this.activeSoundObject.object.position);
       
-      if (distanceToSound <= SETTINGS.soundObjects.activationDistance) {
+      const activationDistance = this.activeSoundObject.object.userData.activationDistance ?? SETTINGS.soundObjects.activationDistance;
+      if (distanceToSound <= activationDistance) {
         if (!this.isIdle) {
           this.idleStartTime = Date.now();
           this.isIdle = true;
@@ -586,9 +600,11 @@ const audioSystem = {
     this.soundObjects.forEach(soundObj => {
       if (!soundObj.object || !soundObj.sound) return;
 
+      const deactivationDistance = soundObj.object.userData.deactivationDistance ?? SETTINGS.soundObjects.deactivationDistance;
+
       const distance = playerPosition.distanceTo(soundObj.object.position);
 
-      if (distance < SETTINGS.soundObjects.deactivationDistance && distance < closestDistance) {
+      if (distance < deactivationDistance && distance < closestDistance) {
         closestDistance = distance;
         closestObject = soundObj;
       }
@@ -597,13 +613,15 @@ const audioSystem = {
     this.checkPlayerIdle(playerPosition);
 
     if (closestObject) {
-      if (closestDistance <= SETTINGS.soundObjects.fullVolumeDistance) {
+      const activationDistance = closestObject.object.userData.activationDistance ?? SETTINGS.soundObjects.activationDistance;
+      const fullVolumeDistance = SETTINGS.soundObjects.fullVolumeDistance;
+      if (closestDistance <= fullVolumeDistance) {
         targetVolume = closestObject.object.userData.soundVolume;
-      } else if (closestDistance <= SETTINGS.soundObjects.activationDistance) {
-        const fadeRange = SETTINGS.soundObjects.activationDistance - SETTINGS.soundObjects.fullVolumeDistance;
-        const fadeDistance = closestDistance - SETTINGS.soundObjects.fullVolumeDistance;
+      } else if (closestDistance <= activationDistance) {
+        const fadeRange = activationDistance - fullVolumeDistance;
+        const fadeDistance = closestDistance - fullVolumeDistance;
         targetVolume = closestObject.object.userData.soundVolume * (1 - (fadeDistance / fadeRange));
-      };
+      }
     }
 
     const volumeDiff = targetVolume - this.currentSoundVolume;
