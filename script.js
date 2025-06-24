@@ -216,7 +216,8 @@ const gameState = {
   playerReady: false,
   levelLoaded: false,
   showCollisionDebug: false,
-  gameStarted: false
+  gameStarted: false,
+  startPhonePickedUp: false // Добавлен флаг для отслеживания поднятия трубки стартового телефона
 };
 
 const keyboardState = {
@@ -1094,6 +1095,12 @@ const playerSystem = {
   handleAction: function () {
     if (!this.currentInteractable) return;
 
+    if (!gameState.startPhonePickedUp) {
+      if (!(this.currentInteractable.userData.isPhone && this.currentInteractable.userData.phoneId === 0)) {
+        return;
+      }
+    }
+
     if (this.currentInteractable.userData.isDoor) {
       this.toggleDoor(this.currentInteractable);
     } else if (this.currentInteractable.userData.isPhone) {
@@ -1724,16 +1731,15 @@ const levelSystem = {
       (gltf) => {
         scene.add(gltf.scene);
 
-        // Add phone properties to phone objects
         gltf.scene.traverse(child => {
           if (child.name.toLowerCase().includes('phone')) {
             child.userData.isPhone = true;
             if (child.name === 'rotary_phoneglb') {
-              child.userData.phoneId = 0; // Starting phone
+              child.userData.phoneId = 0;
             } else if (child.name === 'rotary_phoneglb001') {
-              child.userData.phoneId = 1; // Picture phone
+              child.userData.phoneId = 1;
             } else {
-              child.userData.phoneId = 2; // Forest phone
+              child.userData.phoneId = 2;
             }
             child.userData.isInteractable = true;
             interactableObjects.push(child);
@@ -2386,19 +2392,17 @@ const phoneSystem = {
     const phoneData = this.activePhones.get(phoneObject);
     if (!phoneData) return;
 
-    // Обрабатываем звонок только для начального телефона
     if (phoneData.id === 0) {
       if (phoneData.sound && phoneData.sound.isPlaying) {
         phoneData.sound.stop();
       }
       phoneData.isRinging = false;
       phoneObject.userData.isRinging = false;
+      gameState.startPhonePickedUp = true;
     }
 
-    // Добавляем диалог в просмотренные
     this.viewedDialogs.add(phoneData.id);
 
-    // Запускаем диалог
     phoneDialogSystem.startDialog(phoneData.id);
   },
 
@@ -2406,13 +2410,11 @@ const phoneSystem = {
     const phoneData = this.activePhones.get(phoneObject);
     if (!phoneData) return;
 
-    // Для начального телефона обрабатываем только если он звонит
     if (phoneData.id === 0 && !phoneObject.userData.isRinging) return;
 
-    // Проверяем, можно ли просматривать диалог повторно
     const phoneCall = Object.values(SETTINGS.phoneCalls).find(call => call.id === phoneData.id);
     if (!phoneCall.canBeViewedMultipleTimes && this.viewedDialogs.has(phoneData.id)) {
-      return; // Пропускаем если диалог уже был просмотрен
+      return;
     }
 
     this.stopCall(phoneObject);
