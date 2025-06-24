@@ -8,9 +8,9 @@ const SETTINGS = {
   doorSoundVolume: 0.5,
   musicVolume: 0.001,
   introPhrases: [
-    "срочно, включи звук на своём устройстве, это важно. тут будут происходить малообъяснимые вещи, постарайся в этом не заблудиться. пожалуйста, будь внимательным и предсказуемым, ничего не разбей и не споткнись, иначе произойдет нечто непредвиденное.",
-    "это моя первая игра. и каждый сантиметр этой игры был сделан с любовью. тут ты сможешь расхаживать по коридорам, комнатам, улицам, любуясь картинами, и наслаждаясь новыми песнями с альбома «ЗЕМЛЯНИКА». в общем, чувствуй себя как дома! но знай, не все двери хотят быть открытыми. и вот еще что, не поднимай трубки от незнакомых, а то это уже начинает раздражать.",
-    "давай подождем, пока этот гребаный мир прогрузится",
+    "срочно, включи звук на своём устройстве, это важно. тут будут происходить малообъяснимые вещи, постарайся в этом не заблудиться",
+    "не поднимай трубки от незнакомцев и знай, не все двери хотят быть открытыми",
+    "давай подождем, пока этот гребаный мир прогрузится"
   ],
   typingSpeed: 50,
   phraseDelay: 2000,
@@ -2045,23 +2045,18 @@ function initGame() {
   const startScreen = document.getElementById('start-screen');
   const startButton = document.getElementById('start-button');
   
-  // Start loading all resources immediately
   const loadAllResources = async () => {
     try {
       loadingSystem.startLoading();
       
-      // Load priority resources first
       await loadingSystem.loadPriorityResources();
       
-      // Initialize systems that don't depend on resources
       postProcessingSystem.init();
       controlSystem.init();
       THREE.RectAreaLightUniformsLib.init();
       
-      // Start loading deferred resources
       loadingSystem.loadDeferredResources();
       
-      // Load player model and level in parallel
       await Promise.all([
         new Promise(resolve => {
           playerSystem.loadPlayerModel();
@@ -2083,12 +2078,10 @@ function initGame() {
         })
       ]);
       
-      // Initialize audio system
       await audioSystem.init();
       
       loadingSystem.finishLoading();
       
-      // Enable start button when everything is loaded
       if (startButton) {
         startButton.disabled = false;
         startButton.style.opacity = '1';
@@ -2098,7 +2091,6 @@ function initGame() {
     } catch (error) {
       console.error('Error loading resources:', error);
       loadingSystem.finishLoading();
-      // Still enable the button even if there's an error
       if (startButton) {
         startButton.disabled = false;
         startButton.style.opacity = '1';
@@ -2108,7 +2100,6 @@ function initGame() {
     }
   };
   
-  // Start loading immediately
   loadAllResources();
   
   const handleStartGame = () => {
@@ -2123,10 +2114,8 @@ function initGame() {
     
     resumeAudioContext();
     
-    // Add fade-out class for smooth transition
     startScreen.classList.add('fade-out');
     
-    // Wait for transition to complete before hiding the screen
     setTimeout(() => {
       startScreen.style.display = 'none';
       
@@ -2143,15 +2132,14 @@ function initGame() {
           audioSystem.ambientMusic.currentZone = initialMusicZone;
         }
 
-        // Start the initial phone call after a delay
         setTimeout(() => {
-          phoneSystem.startCall(0); // Start phone with ID 0
+          phoneSystem.startCall(0);
         }, SETTINGS.startPhone.startRingingDelay);
         
       } catch (error) {
         console.error('Error starting game:', error);
       }
-    }, 1500); // Match this with the CSS transition duration
+    }, 1500);
   };
   
   startButton.addEventListener('click', handleStartGame);
@@ -2216,6 +2204,7 @@ const introSystem = {
         font-size: 24px;
         text-align: center;
         width: 80%;
+        font-weight: bold;
       "></div>
       <button id="start-button" style="
         position: absolute;
@@ -2236,6 +2225,14 @@ const introSystem = {
         user-select: none;
       ">НАЧАТЬ ДЕНЬ</button>
     `;
+
+    setTimeout(() => {
+      const style = "font-family: 'Courier New', monospace; font-size: 24px; text-align: center; width: 80%; font-weight: bold;";
+      const width = startScreen.offsetWidth * 0.8 + 'px';
+      const maxHeight = getMaxPhraseHeight(style, width);
+      const introText = document.getElementById('intro-text');
+      if (introText) introText.style.height = maxHeight + 'px';
+    }, 0);
 
     startScreen.addEventListener('click', () => this.skipToNextPhrase());
     startScreen.addEventListener('touchstart', (e) => {
@@ -2467,6 +2464,14 @@ const phoneDialogSystem = {
     this.dialogElement.appendChild(textElement);
     document.body.appendChild(this.dialogElement);
 
+    // === УСТАНОВКА МАКСИМАЛЬНОЙ ВЫСОТЫ ДЛЯ phone-dialog-text ===
+    setTimeout(() => {
+      const style = "font-family: 'Courier New', monospace; font-size: 24px; text-align: center; width: 80%;";
+      const width = window.innerWidth * 0.8 + 'px';
+      const maxHeight = getMaxPhraseHeight(style, width);
+      if (textElement) textElement.style.height = maxHeight + 'px';
+    }, 0);
+
     this.dialogElement.addEventListener('click', () => this.skipToNextPhrase());
     this.dialogElement.addEventListener('touchstart', (e) => {
       e.preventDefault();
@@ -2600,3 +2605,26 @@ window.addEventListener('resize', () => {
   renderer.setSize(width, height);
   postProcessingSystem.onWindowResize();
 });
+
+function measureTextHeight(text, style, width) {
+  const div = document.createElement('div');
+  div.style.cssText = style + `\nposition: absolute; visibility: hidden; pointer-events: none; left: -9999px; top: -9999px; width: ${width}; white-space: pre-line; word-break: break-word;`;
+  div.textContent = text;
+  document.body.appendChild(div);
+  const height = div.offsetHeight;
+  document.body.removeChild(div);
+  return height;
+}
+
+function getMaxPhraseHeight(style, width) {
+  const allPhrases = [
+    ...SETTINGS.introPhrases,
+    ...Object.values(SETTINGS.phoneCalls).flatMap(call => call.phrases)
+  ];
+  let maxHeight = 0;
+  allPhrases.forEach(phrase => {
+    const h = measureTextHeight(phrase, style, width);
+    if (h > maxHeight) maxHeight = h;
+  });
+  return maxHeight;
+}
