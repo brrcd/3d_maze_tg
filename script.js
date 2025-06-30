@@ -197,7 +197,14 @@ document.body.appendChild(renderer.domElement);
 
 const textureLoader = new THREE.TextureLoader();
 const gltfLoader = new THREE.GLTFLoader();
-const fbxLoader = new THREE.FBXLoader();
+const loadingManager = new THREE.LoadingManager();
+loadingManager.setURLModifier((url) => {
+  if (url.includes('modelka1.png')) {
+    return 'assets/models/modelka1.png';
+  }
+  return url;
+});
+const fbxLoader = new THREE.FBXLoader(loadingManager);
 const audioLoader = new THREE.AudioLoader();
 const clock = new THREE.Clock();
 const audioListener = new THREE.AudioListener();
@@ -701,7 +708,7 @@ const animationSystem = {
     'Listening_To_Music',
     'Looking',
     'Rapping',
-    'Wave_Hip_Hop_Dancing'
+    'Wave_Hip_Hop_Dance'
   ],
 
   loadAnimation: function (name, path) {
@@ -883,7 +890,7 @@ const playerSystem = {
 
   loadPlayerModel: function () {
     fbxLoader.load(
-      'assets/models/character.fbx',
+      'assets/models/character_3.fbx',
       (fbx) => {
         this.player = fbx;
         this.player.name = 'player';
@@ -908,7 +915,7 @@ const playerSystem = {
         animationSystem.loadAnimation('Listening_To_Music', 'assets/models/animations/Listening_To_Music.fbx');
         animationSystem.loadAnimation('Looking', 'assets/models/animations/Looking.fbx');
         animationSystem.loadAnimation('Rapping', 'assets/models/animations/Rapping.fbx');
-        animationSystem.loadAnimation('Wave_Hip_Hop_Dancing', 'assets/models/animations/Wave_Hip_Hop_Dancing.fbx');
+        animationSystem.loadAnimation('Wave_Hip_Hop_Dance', 'assets/models/animations/Wave_Hip_Hop_Dance.fbx');
 
         const checkIdleAnimation = setInterval(() => {
           if (animationSystem.animations['Idle']) {
@@ -1549,7 +1556,7 @@ const loadingSystem = {
     document.getElementById('start-screen').appendChild(this.loadingElement);
     
     this.priorityResources = [
-      'assets/models/Hazmat_Character.fbx',
+      'assets/models/character_3.fbx',
       'assets/levels/level_2.glb',
       'assets/textures/wood_floor.jpg',
       'assets/audio/ambient/room.mp3',
