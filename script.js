@@ -2265,12 +2265,6 @@ const introSystem = {
       if (introText) introText.style.height = maxHeight + 'px';
     }, 0);
 
-    startScreen.addEventListener('click', () => this.skipToNextPhrase());
-    startScreen.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      this.skipToNextPhrase();
-    });
-
     this.startTyping();
   },
 
@@ -2311,26 +2305,6 @@ const introSystem = {
         }, SETTINGS.phraseDelay);
       }
     }, SETTINGS.typingSpeed);
-  },
-
-  skipToNextPhrase: function () {
-    if (this.isTyping) {
-      clearInterval(this.typingInterval);
-      this.isTyping = false;
-
-      const textElement = document.getElementById('intro-text');
-      textElement.textContent = SETTINGS.introPhrases[this.currentPhraseIndex];
-
-      if (this.currentPhraseIndex === SETTINGS.introPhrases.length - 1) {
-        document.getElementById('start-button').style.display = 'block';
-      } else {
-        setTimeout(() => {
-          textElement.textContent = '';
-          this.currentPhraseIndex++;
-          this.startTyping();
-        }, 300);
-      }
-    }
   }
 };
 
@@ -2498,12 +2472,6 @@ const phoneDialogSystem = {
       const maxHeight = getMaxPhraseHeight(style, width);
       if (textElement) textElement.style.height = maxHeight + 'px';
     }, 0);
-
-    this.dialogElement.addEventListener('click', () => this.skipToNextPhrase());
-    this.dialogElement.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      this.skipToNextPhrase();
-    });
   },
 
   startDialog: function(phoneId) {
@@ -2563,29 +2531,6 @@ const phoneDialogSystem = {
         }
       }
     }, phoneCall.typingSpeed);
-  },
-
-  skipToNextPhrase: function() {
-    if (!this.isDialogActive) return;
-
-    if (this.isTyping) {
-      clearInterval(this.typingInterval);
-      this.isTyping = false;
-
-      const textElement = document.getElementById('phone-dialog-text');
-      const phoneCall = Object.values(SETTINGS.phoneCalls).find(call => call.id === this.currentPhoneId);
-      textElement.textContent = phoneCall.phrases[this.currentPhraseIndex];
-
-      if (this.currentPhraseIndex === phoneCall.phrases.length - 1) {
-        setTimeout(() => this.endDialog(), 300);
-      } else {
-        setTimeout(() => {
-          textElement.textContent = '';
-          this.currentPhraseIndex++;
-          this.startTyping();
-        }, 300);
-      }
-    }
   },
 
   endDialog: function() {
