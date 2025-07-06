@@ -200,7 +200,7 @@ const gltfLoader = new THREE.GLTFLoader();
 const loadingManager = new THREE.LoadingManager();
 loadingManager.setURLModifier((url) => {
   if (url.includes('modelka1.png')) {
-    return 'assets/models/modelka1.png';
+    return 'assets/models/modelka.jpg';
   }
   return url;
 });
